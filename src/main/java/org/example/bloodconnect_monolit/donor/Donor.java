@@ -13,14 +13,24 @@ public class Donor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long donorId;
 
+    @Column(nullable = false)
     private String fullName;
+
+    @Column(nullable = false)
     private LocalDate birthDate;
+
     private String bloodGroup;
     private String rhesusFactor;
-    private String phoneNumber;
+
+    @Column(nullable = false)
     private String address;
+
+    @Column(nullable = false)
     private String city;
+
+    @Column(nullable = false)
     private String gender;
+
     private LocalDateTime createdAt = LocalDateTime.now();
-    private String email;
+
 }
