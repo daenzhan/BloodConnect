@@ -2,6 +2,7 @@ package org.example.bloodconnect_monolit.bloodCenter;
 
 
 import jakarta.persistence.*;
+import lombok.Data;
 
 @Entity
 @Table(name = "bloodcenter")

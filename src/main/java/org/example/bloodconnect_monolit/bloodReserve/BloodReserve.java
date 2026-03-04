@@ -1,5 +1,6 @@
 package org.example.bloodconnect_monolit.bloodReserve;
 import jakarta.persistence.*;
+import lombok.Data;
 
 @Entity
 @Table(name = "bloodreserve")

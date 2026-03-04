@@ -2,6 +2,7 @@ package org.example.bloodconnect_monolit.bloodRequest;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Entity
 @Table(name = "bloodrequest")

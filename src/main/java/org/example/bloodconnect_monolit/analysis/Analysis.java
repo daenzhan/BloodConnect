@@ -4,6 +4,7 @@ package org.example.bloodconnect_monolit.analysis;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Entity
 @Table(name = "analysis")

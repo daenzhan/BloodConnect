@@ -1,6 +1,7 @@
 package org.example.bloodconnect_monolit.medCenter;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Entity
 @Table(name = "medcenters")
