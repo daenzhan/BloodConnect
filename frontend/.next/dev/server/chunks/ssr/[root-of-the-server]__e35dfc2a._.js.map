@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///D:/Desktop/all/BloodConnect_Monolit/frontend/src/app/page.tsx"],"sourcesContent":["import { redirect } from \"next/navigation\"\r\n\r\nexport default function RootPage() {\r\n    redirect(\"/home\")\r\n}\r\n"],"names":[],"mappings":";;;;AAAA;AAAA;;AAEe,SAAS;IACpB,IAAA,iMAAQ,EAAC;AACb"}}]
-}
