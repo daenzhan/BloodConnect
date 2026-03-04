@@ -33,4 +33,7 @@ public class Donor {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(unique = true, nullable = false)
+    private Long userId;
+
 }

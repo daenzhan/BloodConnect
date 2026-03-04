@@ -3,7 +3,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/db_blood_donation
     username: postgres
-    password: 888
+    password: diplom_password
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

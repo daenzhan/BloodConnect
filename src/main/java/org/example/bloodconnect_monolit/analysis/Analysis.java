@@ -13,6 +13,7 @@ public class Analysis {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long analysisId;
 
+    @Column(nullable = false)
     private String status;
 
     private String hiv; // ВИЧ
@@ -25,9 +26,12 @@ public class Analysis {
     private String rhesusFactor;
     private Double hemoglobin;
     private LocalDateTime analysisDate;
-    private String technicianNotes = LocalDateTime.now();
+    private String technicianNotes;
 
     @Column(nullable = false)
     private Long donationId;  // внутри есть bloodCenterId и donorId
+
+    @Column(nullable = false)
+    private Long bloodCenterId;
 
 }

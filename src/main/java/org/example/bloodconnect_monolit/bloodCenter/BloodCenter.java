@@ -18,7 +18,7 @@ public class BloodCenter {
     private String location;
 
     @Column(nullable = false)
-    private String city
+    private String city;
 
     private String specialization;
     private String licenseFile;

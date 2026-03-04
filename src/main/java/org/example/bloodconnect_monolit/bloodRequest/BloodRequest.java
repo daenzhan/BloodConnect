@@ -30,6 +30,5 @@ public class BloodRequest {
     @Column(nullable = false)
     private Long medCenterId;
 
-    @Column(nullable = false)
-    private Long bloodBloodId;   // сделаем так чтобы медцентр выбирал нужный ему центр крови?
+    private Long bloodCenterId;   // сделаем так чтобы медцентр выбирал нужный ему центр крови?
 }
