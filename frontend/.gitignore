@@ -7,10 +7,28 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Зависимости
 node_modules
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Сборка Next.js
+.next
+out
+build
 dist
 dist-ssr
+.nitro
+.cache
+
+# Локальные файлы окружения
 *.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +40,35 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.vsix
+
+# Backend (Spring Boot)
+**/build/
+**/target/
+**/bin/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+*.pid
+*.hprof
+.gradle/
+**/.gradle/
+
+# Базы данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Тесты
+coverage
+.nyc_output
+*.test.tsx.snap
+*.test.ts.snap
+
+# Временные файлы
+*.tmp
+*.temp
+.cache
