@@ -1,14 +1,18 @@
 package org.example.bloodconnect_monolit.analysis;
 
-
 import jakarta.persistence.*;
-
-import java.time.LocalDateTime;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
+import org.example.bloodconnect_monolit.donation.Donation;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "analysis")
+@Table(name = "analyses")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Analysis {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,22 +21,23 @@ public class Analysis {
     @Column(nullable = false)
     private String status;
 
-    private String hiv; // ВИЧ
+    private String hiv;
     private String brucellosis;
     private String hepatitisB;
     private String hepatitisC;
     private String syphilis;
-    private Double altLevel;  // убрать?
+    private Double altLevel;
     private String bloodGroup;
     private String rhesusFactor;
     private Double hemoglobin;
     private LocalDateTime analysisDate;
     private String technicianNotes;
 
-    @Column(nullable = false)
-    private Long donationId;  // внутри есть bloodCenterId и donorId
+    @OneToOne
+    @JoinColumn(name = "donationId", nullable = false)
+    private Donation donation;
 
-    @Column(nullable = false)
-    private Long bloodCenterId;
-
+    @ManyToOne
+    @JoinColumn(name = "bloodCenterId", nullable = false)
+    private BloodCenter bloodCenter;
 }

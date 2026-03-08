@@ -1,10 +1,17 @@
 package org.example.bloodconnect_monolit.bloodReserve;
+
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
+import org.example.bloodconnect_monolit.donation.Donation;
 
 @Entity
-@Table(name = "bloodreserve")
+@Table(name = "bloodreserves")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class BloodReserve {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,9 +23,11 @@ public class BloodReserve {
     @Column(nullable = false)
     private String rhesusFactor;
 
-    @Column(nullable = false)
-    private Long bloodCenterId;
+    @OneToOne
+    @JoinColumn(name = "bloodCenterId", nullable = false)
+    private BloodCenter bloodCenter;
 
-    @Column(nullable = false)
-    private Long donationId;
+    @ManyToOne
+    @JoinColumn(name = "donationId", nullable = false)
+    private Donation donation;
 }

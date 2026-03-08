@@ -1,12 +1,19 @@
 package org.example.bloodconnect_monolit.bloodRequest;
+
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
+import org.example.bloodconnect_monolit.medCenter.MedCenter;
 
 import java.time.LocalDateTime;
-import lombok.Data;
 
 @Entity
-@Table(name = "bloodrequest")
+@Table(name = "bloodrequests")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class BloodRequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,11 +32,16 @@ public class BloodRequest {
     private String volume;
 
     private LocalDateTime deadline;
+
     private String status;
+
     private String comment;
 
-    @Column(nullable = false)
-    private Long medCenterId;
+    @ManyToOne
+    @JoinColumn(name = "medCenterId", nullable = false)
+    private MedCenter medCenter;
 
-    private Long bloodCenterId;   // сделаем так чтобы медцентр выбирал нужный ему центр крови?
+    @ManyToOne
+    @JoinColumn(name = "bloodCenterId")
+    private BloodCenter bloodCenter;
 }
