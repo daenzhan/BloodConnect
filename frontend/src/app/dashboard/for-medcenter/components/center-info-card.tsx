@@ -16,8 +16,7 @@ export function CenterInfoCard({ name, location, phone, specialization }: Center
                     <Building2 className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                    <h3 className="font-semibold text-foreground">Center Information</h3>
-                    <p className="text-sm text-muted-foreground">Your medical center details</p>
+                    <h3 className="font-semibold text-foreground">Center information</h3>
                 </div>
             </div>
 

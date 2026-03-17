@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MapPin, Search, ExternalLink, Building2, ArrowLeft } from "lucide-react"
+import { MapPin, Search, ExternalLink, Building2, ArrowLeft, AlertCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 
@@ -23,6 +23,7 @@ export default function BloodCentersPage() {
     const [centers, setCenters] = useState<BloodCenter[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
+    const [error, setError] = useState<string | null>(null)
 
     const searchParams = useSearchParams()
     const medCenterId = searchParams.get('id')
@@ -30,13 +31,43 @@ export default function BloodCentersPage() {
     useEffect(() => {
         const fetchCenters = async () => {
             try {
-                const response = await fetch("http://localhost:8080/blood-centers")
-                if (response.ok) {
-                    const data = await response.json()
-                    setCenters(data)
+                setError(null)
+                console.log("Fetching blood centers from backend...")
+
+                const response = await fetch("http://localhost:8080/blood-centers", {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
+
+                console.log("Response status:", response.status)
+
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        throw new Error("Access forbidden. Please check CORS configuration on the backend.")
+                    } else if (response.status === 404) {
+                        throw new Error("Blood centers endpoint not found. Please check the backend URL.")
+                    } else {
+                        throw new Error(`Failed to fetch blood centers: ${response.status} ${response.statusText}`)
+                    }
                 }
+
+                const data = await response.json()
+                console.log("Blood centers received:", data)
+
+                // Проверяем, что данные - это массив
+                if (Array.isArray(data)) {
+                    setCenters(data)
+                } else {
+                    console.error("Received data is not an array:", data)
+                    setCenters([])
+                }
+
             } catch (error) {
                 console.error("Error fetching blood centers:", error)
+                setError(error instanceof Error ? error.message : "Failed to load blood centers. Please try again later.")
+                setCenters([])
             } finally {
                 setIsLoading(false)
             }
@@ -46,20 +77,22 @@ export default function BloodCentersPage() {
     }, [])
 
     const filteredCenters = centers.filter(center =>
-        center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        center.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        center.city.toLowerCase().includes(searchQuery.toLowerCase())
+        center.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        center.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        center.city?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     const getFullAddress = (center: BloodCenter) => {
-        return `${center.location}, ${center.city}`
+        return `${center.location || ''}, ${center.city || ''}`
     }
 
     const openInMaps = (center: BloodCenter) => {
         if (center.latitude && center.longitude) {
             window.open(`https://maps.google.com/?q=${center.latitude},${center.longitude}`, "_blank")
-        } else {
+        } else if (center.location && center.city) {
             window.open(`https://maps.google.com/?q=${encodeURIComponent(getFullAddress(center))}`, "_blank")
+        } else {
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(center.name)}`, "_blank")
         }
     }
 
@@ -91,11 +124,9 @@ export default function BloodCentersPage() {
                     <MapPin className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground">Blood Centers</h1>
-                    <p className="text-muted-foreground">Find blood donation centers near you</p>
-                    {medCenterId && (
-                        <p className="text-xs text-muted-foreground mt-1">Center ID: {medCenterId}</p>
-                    )}
+                    <h1 className="text-2xl font-bold text-foreground">Blood centers</h1>
+
+
                 </div>
             </div>
 
@@ -107,62 +138,92 @@ export default function BloodCentersPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 rounded-xl"
                 />
+                {centers.length > 0 && (
+                    <p className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        {filteredCenters.length} of {centers.length}
+                    </p>
+                )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredCenters.map((center) => (
-                    <Card key={center.bloodCenterId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Building2 className="w-5 h-5 text-primary" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-foreground">{center.name}</h3>
-                                    <p className="text-sm text-muted-foreground">{center.city}</p>
-                                </div>
-                            </div>
+            {error && (
+                <Card className="p-6 mb-6 bg-destructive/5 border-destructive/20">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                        <div>
+                            <h3 className="font-semibold text-destructive mb-1">Connection Error</h3>
+                            <p className="text-sm text-destructive/80">{error}</p>
+                            <p className="text-sm text-destructive/80 mt-2">
+                                Make sure the backend server is running on http://localhost:8080
+                            </p>
                         </div>
+                    </div>
+                </Card>
+            )}
 
-                        <div className="space-y-2 mb-4">
-                            <div className="flex items-start gap-2 text-sm">
-                                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                                <span className="text-muted-foreground">{getFullAddress(center)}</span>
-                            </div>
-                            {center.specialization && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                                    <span className="text-muted-foreground">{center.specialization}</span>
-                                </div>
-                            )}
-                            {center.directorFullName && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <span className="text-muted-foreground">Director: {center.directorFullName}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 rounded-xl"
-                                onClick={() => openInMaps(center)}
-                            >
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                View on Map
-                            </Button>
-                        </div>
-                    </Card>
-                ))}
-            </div>
-
-            {filteredCenters.length === 0 && (
+            {!error && centers.length === 0 ? (
                 <Card className="p-8 text-center rounded-2xl border border-border">
                     <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-foreground mb-2">No Centers Found</h2>
+                    <h2 className="text-lg font-semibold text-foreground mb-2">No Blood centers found</h2>
+                    <p className="text-muted-foreground mb-4">
+                        There are no blood centers registered in the system yet.
+                    </p>
+                </Card>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredCenters.map((center) => (
+                        <Card key={center.bloodCenterId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                        <Building2 className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-foreground">{center.name}</h3>
+                                        <p className="text-sm text-muted-foreground">{center.city}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 mb-4">
+                                <div className="flex items-start gap-2 text-sm">
+                                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <span className="text-muted-foreground">{getFullAddress(center)}</span>
+                                </div>
+                                {center.specialization && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                                        <span className="text-muted-foreground">{center.specialization}</span>
+                                    </div>
+                                )}
+                                {center.directorFullName && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-muted-foreground">Director: {center.directorFullName}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 rounded-xl"
+                                    onClick={() => openInMaps(center)}
+                                >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    View on Map
+                                </Button>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            {!error && centers.length > 0 && filteredCenters.length === 0 && (
+                <Card className="p-8 text-center rounded-2xl border border-border mt-4">
+                    <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h2 className="text-lg font-semibold text-foreground mb-2">No results found</h2>
                     <p className="text-muted-foreground">
-                        No blood centers match your search criteria. Try a different search term.
+                        No centers match your search criteria. Try a different search term.
                     </p>
                 </Card>
             )}

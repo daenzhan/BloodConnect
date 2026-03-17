@@ -158,7 +158,6 @@ export default function MyRequestsPage() {
         }
     }
 
-    // Update request status
     const handleStatusUpdate = async (requestId: number, newStatus: string) => {
         try {
             const response = await fetch(`http://localhost:8080/blood-requests/${requestId}/status?status=${newStatus}`, {
@@ -212,27 +211,26 @@ export default function MyRequestsPage() {
 
     return (
         <div>
-            {/* Header */}
+
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                         <ClipboardList className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">My Requests</h1>
-                        <p className="text-muted-foreground">View and manage your blood requests</p>
-                        <p className="text-xs text-muted-foreground mt-1">Center ID: {medCenterId}</p>
+                        <h1 className="text-2xl font-bold text-foreground">My requests</h1>
+
+
                     </div>
                 </div>
                 <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
                     <Button className="bg-primary hover:bg-primary/90 gap-2 rounded-xl">
                         <Plus className="w-4 h-4" />
-                        New Request
+                        New request
                     </Button>
                 </Link>
             </div>
 
-            {/* Filters */}
             <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-muted-foreground" />
@@ -243,11 +241,11 @@ export default function MyRequestsPage() {
                         <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                        <SelectItem value="ALL" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">All Requests</SelectItem>
+                        <SelectItem value="ALL" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">All requests</SelectItem>
                         <SelectItem value="PENDING" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Pending</SelectItem>
                         <SelectItem value="APPROVED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Approved</SelectItem>
                         <SelectItem value="REJECTED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Rejected</SelectItem>
-                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">In Progress</SelectItem>
+                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">In progress</SelectItem>
                         <SelectItem value="COMPLETED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Completed</SelectItem>
                     </SelectContent>
                 </Select>
@@ -256,11 +254,10 @@ export default function MyRequestsPage() {
                 </span>
             </div>
 
-            {/* Requests List */}
             {filteredRequests.length === 0 ? (
                 <Card className="p-8 text-center rounded-2xl border border-border">
                     <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-foreground mb-2">No Requests Found</h2>
+                    <h2 className="text-lg font-semibold text-foreground mb-2">No requests found</h2>
                     <p className="text-muted-foreground mb-4">
                         {statusFilter === "ALL"
                             ? "You haven't created any blood requests yet."
@@ -268,7 +265,7 @@ export default function MyRequestsPage() {
                     </p>
                     <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
-                            Create Your First Request
+                            Create your first request
                         </Button>
                     </Link>
                 </Card>
@@ -285,18 +282,17 @@ export default function MyRequestsPage() {
                             <Card key={request.bloodRequestId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all relative group">
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-start gap-4 flex-1">
-                                        {/* Blood Type Icon */}
+
                                         <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
                                             <span className="text-lg font-bold text-primary">{bloodType}</span>
                                         </div>
 
-                                        {/* Request Details */}
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <h3 className="font-semibold text-foreground">
                                                     {request.volume} of {bloodType} ({componentLabel})
                                                 </h3>
-                                                {/* Quick Status Update Dropdown */}
+
                                                 <Select
                                                     value={request.status}
                                                     onValueChange={(value) => handleStatusUpdate(request.bloodRequestId, value)}
@@ -307,7 +303,7 @@ export default function MyRequestsPage() {
                                                     <SelectContent className="bg-white border border-gray-200 shadow-lg">
                                                         <SelectItem value="PENDING" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Pending</SelectItem>
                                                         <SelectItem value="APPROVED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Approved</SelectItem>
-                                                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">In Progress</SelectItem>
+                                                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">In progress</SelectItem>
                                                         <SelectItem value="COMPLETED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Completed</SelectItem>
                                                         <SelectItem value="REJECTED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Rejected</SelectItem>
                                                     </SelectContent>
@@ -337,14 +333,12 @@ export default function MyRequestsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Status Badge and Actions */}
                                     <div className="flex items-start gap-2">
                                         <Badge variant="outline" className={`${status.color} flex items-center gap-1 px-3 py-1`}>
                                             <StatusIcon className="w-3 h-3" />
                                             {status.label}
                                         </Badge>
 
-                                        {/* Actions Dropdown */}
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 bg-white hover:bg-gray-100">
@@ -357,14 +351,14 @@ export default function MyRequestsPage() {
                                                     className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
                                                 >
                                                     <Eye className="w-4 h-4 mr-2" />
-                                                    View Details
+                                                    View details
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/edit?id=${medCenterId}`)}
                                                     className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
                                                 >
                                                     <Edit className="w-4 h-4 mr-2" />
-                                                    Edit Request
+                                                    Edit request
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-red-600"
@@ -374,7 +368,7 @@ export default function MyRequestsPage() {
                                                     }}
                                                 >
                                                     <Trash2 className="w-4 h-4 mr-2" />
-                                                    Delete Request
+                                                    Delete request
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>

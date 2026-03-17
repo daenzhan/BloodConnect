@@ -1,11 +1,9 @@
-"use client"
 
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-// Matches BloodRequest.java entity
 interface BloodRequest {
     bloodRequestId: number
     componentType: string
@@ -15,6 +13,7 @@ interface BloodRequest {
     deadline?: string
     status: string
     comment?: string
+    displayBloodType?: string
 }
 
 interface RecentRequestsProps {
@@ -24,23 +23,28 @@ interface RecentRequestsProps {
 const statusConfig = {
     PENDING: {
         icon: Clock,
-        color: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+        color: "bg-yellow-100 text-yellow-700 border-yellow-200",
         label: "Pending"
     },
     APPROVED: {
         icon: CheckCircle,
-        color: "bg-chart-2/10 text-chart-2 border-chart-2/20",
+        color: "bg-green-100 text-green-700 border-green-200",
         label: "Approved"
     },
     REJECTED: {
         icon: XCircle,
-        color: "bg-destructive/10 text-destructive border-destructive/20",
+        color: "bg-red-100 text-red-700 border-red-200",
         label: "Rejected"
     },
     IN_PROGRESS: {
         icon: AlertCircle,
-        color: "bg-chart-3/10 text-chart-3 border-chart-3/20",
+        color: "bg-blue-100 text-blue-700 border-blue-200",
         label: "In Progress"
+    },
+    COMPLETED: {
+        icon: CheckCircle,
+        color: "bg-purple-100 text-purple-700 border-purple-200",
+        label: "Completed"
     }
 }
 
@@ -51,6 +55,14 @@ const componentTypeLabels: Record<string, string> = {
     RED_CELLS: "Red Cells",
     CRYOPRECIPITATE: "Cryo"
 }
+
+const formatRhesusSymbol = (rhesusFactor: string): string => {
+    if (!rhesusFactor) return "";
+    const lower = rhesusFactor.toLowerCase();
+    if (lower.includes("positive") || lower === "+") return "+";
+    if (lower.includes("negative") || lower === "-") return "-";
+    return rhesusFactor;
+};
 
 export function RecentRequests({ requests }: RecentRequestsProps) {
     const formatDate = (dateString?: string) => {
@@ -63,19 +75,25 @@ export function RecentRequests({ requests }: RecentRequestsProps) {
         })
     }
 
-    const getBloodTypeDisplay = (request: BloodRequest) => {
-        return `${request.bloodGroup}${request.rhesusFactor}`
+    const getBloodTypeDisplay = (request: BloodRequest): string => {
+
+        if (request.displayBloodType) {
+            return request.displayBloodType;
+        }
+
+        const rhesusSymbol = formatRhesusSymbol(request.rhesusFactor);
+        return `${request.bloodGroup}${rhesusSymbol}`;
     }
 
     return (
         <Card className="p-4 rounded-2xl border border-border">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground">Recent Requests</h3>
+                <h3 className="font-semibold text-foreground">Recent requests</h3>
                 <Link
                     href="/dashboard/for-medcenter/my-requests"
                     className="text-sm text-primary hover:underline"
                 >
-                    View All
+                    View all
                 </Link>
             </div>
 

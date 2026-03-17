@@ -137,7 +137,7 @@ export default function ProfilePage() {
                     onClick={() => router.back()}
                     className="bg-primary hover:bg-primary/90 rounded-xl"
                 >
-                    Go Back
+                    Go back
                 </Button>
             </div>
         )
@@ -151,7 +151,7 @@ export default function ProfilePage() {
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    Back to Dashboard
+                    Back to dashboard
                 </Link>
             </div>
 
@@ -161,8 +161,8 @@ export default function ProfilePage() {
                         <User className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">Medical Center Profile</h1>
-                        <p className="text-muted-foreground">ID: {profile.medCenterId}</p>
+                        <h1 className="text-2xl font-bold text-foreground">Medical center profile</h1>
+
                     </div>
                 </div>
                 {!isEditing ? (
@@ -172,7 +172,7 @@ export default function ProfilePage() {
                         onClick={() => setIsEditing(true)}
                     >
                         <Edit2 className="w-4 h-4" />
-                        Edit Profile
+                        Edit
                     </Button>
                 ) : (
                     <div className="flex gap-2">
@@ -200,7 +200,7 @@ export default function ProfilePage() {
                             ) : (
                                 <>
                                     <Save className="w-4 h-4 mr-2" />
-                                    Save Changes
+                                    Save changes
                                 </>
                             )}
                         </Button>
@@ -211,12 +211,12 @@ export default function ProfilePage() {
             <Card className="p-6 rounded-2xl border border-border mb-6">
                 <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                     <Building2 className="w-5 h-5 text-primary" />
-                    Center Information
+                    Center information
                 </h2>
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Center Name</Label>
+                        <Label htmlFor="name">Name</Label>
                         {isEditing ? (
                             <Input
                                 id="name"
@@ -249,7 +249,7 @@ export default function ProfilePage() {
                     <div className="space-y-2">
                         <Label htmlFor="phone" className="flex items-center gap-2">
                             <Phone className="w-4 h-4" />
-                            Phone Number
+                            Phone number
                         </Label>
                         {isEditing ? (
                             <Input
@@ -284,12 +284,12 @@ export default function ProfilePage() {
             <Card className="p-6 rounded-2xl border border-border">
                 <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-primary" />
-                    Additional Details
+                    Additional details
                 </h2>
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="directorFullName">Director Full Name</Label>
+                        <Label htmlFor="directorFullName">Director's full name</Label>
                         {isEditing ? (
                             <Input
                                 id="directorFullName"
@@ -305,7 +305,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label>License File</Label>
+                        <Label>License file</Label>
                         <p className="text-foreground p-3 bg-muted/50 rounded-xl">
                             {profile.licenseFile || "No license file uploaded"}
                         </p>
@@ -314,7 +314,7 @@ export default function ProfilePage() {
                     <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            Member Since
+                            Member since
                         </Label>
                         <p className="text-foreground p-3 bg-muted/50 rounded-xl">
                             {formatDate(profile.createdAt)}

@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card"
-import { Building2 } from "lucide-react"
+import { Building2, Heart } from "lucide-react"
 
 interface WelcomeCardProps {
     centerName: string
@@ -9,18 +9,20 @@ export function WelcomeCard({ centerName }: WelcomeCardProps) {
     return (
         <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-6 rounded-2xl relative overflow-hidden">
             <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2">Welcome back...</h2>
-                <p className="text-primary-foreground/80 mb-4">
-                    {centerName}<br />
-                    Managing blood requests efficiently.
+                <h2 className="text-2xl font-bold mb-2">
+                    Welcome back, {centerName}!
+                </h2>
+
+                <p className="text-primary-foreground/80 text-lg italic mb-4">
+                    "Ready to save more lives today?"
                 </p>
-                <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="w-4 h-4" />
-                    <span>Medical Center Portal</span>
+
+
+                <div className="text-xs opacity-60 mt-2">
+                    @ BloodConnect
                 </div>
             </div>
 
-            {/* Decorative elements */}
             <div className="absolute right-4 bottom-4 opacity-20">
                 <Building2 className="w-24 h-24" />
             </div>

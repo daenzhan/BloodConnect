@@ -57,7 +57,7 @@ export function RequestStats({
 
     return (
         <Card className="p-6 rounded-2xl border border-border">
-            <h3 className="font-semibold text-foreground mb-4">Request Statistics</h3>
+            <h3 className="font-semibold text-foreground mb-4">Request statistics</h3>
             <div className="grid grid-cols-2 gap-4">
                 {statsItems.map((item) => {
                     const Icon = item.icon

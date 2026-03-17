@@ -47,8 +47,8 @@ const volumeOptions = [
 ]
 
 const unitOptions = [
-    { value: "ml", label: "Milliliters (ml)" },
-    { value: "L", label: "Liters (L)" }
+    { value: "ml", label: "ml" },
+    { value: "L", label: "L" }
 ]
 
 export default function CreateRequestPage() {
@@ -83,7 +83,6 @@ export default function CreateRequestPage() {
             return
         }
 
-        // Determine final volume
         let finalVolume = formData.volume
         if (isCustomVolume && customVolumeValue) {
             finalVolume = `${customVolumeValue}${customVolumeUnit}`
@@ -140,13 +139,13 @@ export default function CreateRequestPage() {
                     <div className="w-16 h-16 bg-chart-2/10 rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle className="w-8 h-8 text-chart-2" />
                     </div>
-                    <h2 className="text-xl font-bold text-foreground mb-2">Request Created!</h2>
+                    <h2 className="text-xl font-bold text-foreground mb-2">Request created!</h2>
                     <p className="text-muted-foreground mb-4">
                         Your blood request has been submitted successfully.
                     </p>
                     <Link href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
-                            View My Requests
+                            View my requests
                         </Button>
                     </Link>
                 </Card>
@@ -162,25 +161,25 @@ export default function CreateRequestPage() {
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    Back to Dashboard
+                    Back to dashboard
                 </Link>
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                         <FileText className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">Create Blood Request</h1>
-                        <p className="text-muted-foreground">Submit a new blood request for your patients</p>
+                        <h1 className="text-2xl font-bold text-foreground">Create blood request</h1>
+
                     </div>
                 </div>
             </div>
 
             <Card className="p-6 rounded-2xl border border-border">
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Component Type */}
+
                     <div className="space-y-2">
                         <Label htmlFor="componentType" className="text-sm font-medium">
-                            Component Type <span className="text-red-500">*</span>
+                            Component type <span className="text-red-500">*</span>
                         </Label>
                         <Select
                             value={formData.componentType}
@@ -204,11 +203,10 @@ export default function CreateRequestPage() {
                         </Select>
                     </div>
 
-                    {/* Blood Group and Rhesus Factor */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="bloodGroup" className="text-sm font-medium">
-                                Blood Group <span className="text-red-500">*</span>
+                                Blood group <span className="text-red-500">*</span>
                             </Label>
                             <Select
                                 value={formData.bloodGroup}
@@ -234,7 +232,7 @@ export default function CreateRequestPage() {
 
                         <div className="space-y-2">
                             <Label htmlFor="rhesusFactor" className="text-sm font-medium">
-                                Rhesus Factor <span className="text-red-500">*</span>
+                                Rhesus factor <span className="text-red-500">*</span>
                             </Label>
                             <Select
                                 value={formData.rhesusFactor}
@@ -259,7 +257,6 @@ export default function CreateRequestPage() {
                         </div>
                     </div>
 
-                    {/* Volume with Custom Input Option */}
                     <div className="space-y-4">
                         <Label className="text-sm font-medium">
                             Volume <span className="text-red-500">*</span>
@@ -361,7 +358,6 @@ export default function CreateRequestPage() {
                         )}
                     </div>
 
-                    {/* Deadline */}
                     <div className="space-y-2">
                         <Label htmlFor="deadline" className="text-sm font-medium">
                             Deadline <span className="text-gray-400 text-xs">(Optional)</span>
@@ -375,10 +371,9 @@ export default function CreateRequestPage() {
                         />
                     </div>
 
-                    {/* Comments */}
                     <div className="space-y-2">
                         <Label htmlFor="comment" className="text-sm font-medium">
-                            Additional Comments <span className="text-gray-400 text-xs">(Optional)</span>
+                            Additional comments <span className="text-gray-400 text-xs">(Optional)</span>
                         </Label>
                         <Textarea
                             id="comment"
@@ -396,7 +391,6 @@ export default function CreateRequestPage() {
                         </div>
                     )}
 
-                    {/* Buttons */}
                     <div className="flex gap-4 pt-4">
                         <Link href={`/dashboard/for-medcenter?id=${medCenterId}`} className="flex-1">
                             <Button
@@ -418,7 +412,7 @@ export default function CreateRequestPage() {
                                     Submitting...
                                 </span>
                             ) : (
-                                "Submit Request"
+                                "Submit request"
                             )}
                         </Button>
                     </div>

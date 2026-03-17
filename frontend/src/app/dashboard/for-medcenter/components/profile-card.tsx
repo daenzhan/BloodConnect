@@ -20,12 +20,7 @@ export function ProfileCard({ name, location }: ProfileCardProps) {
 
     return (
         <div className="flex items-center gap-4">
-            <Link href="/dashboard/for-medcenter/create-request">
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 rounded-xl px-5">
-                    <FileText className="w-4 h-4" />
-                    <span className="hidden sm:inline">Create Request</span>
-                </Button>
-            </Link>
+
 
             <div className="relative">
                 <button

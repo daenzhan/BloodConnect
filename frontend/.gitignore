@@ -72,3 +72,6 @@ coverage
 *.tmp
 *.temp
 .cache
+
+.env.local
+.env*.localtaskkill /F /IM node.exe

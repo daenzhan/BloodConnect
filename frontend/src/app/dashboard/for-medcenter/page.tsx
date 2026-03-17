@@ -39,6 +39,24 @@ interface BloodRequest {
     }
 }
 
+// Функция для преобразования rhesusFactor в символ
+const formatRhesusSymbol = (rhesusFactor: string): string => {
+    if (!rhesusFactor) return "";
+
+    const lower = rhesusFactor.toLowerCase();
+    if (lower.includes("positive") || lower === "+") {
+        return "+";
+    } else if (lower.includes("negative") || lower === "-") {
+        return "-";
+    }
+    return rhesusFactor;
+};
+
+const getBloodTypeDisplay = (request: BloodRequest): string => {
+    const rhesusSymbol = formatRhesusSymbol(request.rhesusFactor);
+    return `${request.bloodGroup}${rhesusSymbol}`;
+};
+
 export default function MedCenterDashboard() {
     const [currentDate] = useState(new Date())
     const [medCenter, setMedCenter] = useState<MedCenterData | null>(null)
@@ -75,7 +93,13 @@ export default function MedCenterDashboard() {
                 if (requestsResponse.ok) {
                     const requestsData = await requestsResponse.json()
                     console.log("Requests received:", requestsData)
-                    setRequests(requestsData)
+
+                    const formattedRequests = requestsData.map((req: BloodRequest) => ({
+                        ...req,
+                        displayBloodType: getBloodTypeDisplay(req)
+                    }))
+
+                    setRequests(formattedRequests)
                 } else {
                     console.log("No requests found or error fetching requests")
                 }
@@ -144,9 +168,7 @@ export default function MedCenterDashboard() {
                         Hello, {medCenter.name}!
                     </h1>
                     <p className="text-muted-foreground">{formatDate(currentDate)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Center ID: {medCenter.medCenterId} | URL ID: {medCenterId}
-                    </p>
+
                 </div>
                 <ProfileCard
                     name={medCenter.name}
@@ -167,7 +189,12 @@ export default function MedCenterDashboard() {
             <QuickActions />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <RecentRequests requests={requests} />
+                <RecentRequests
+                    requests={requests.map(req => ({
+                        ...req,
+                        displayBloodType: getBloodTypeDisplay(req)
+                    }))}
+                />
                 <RequestStats
                     totalRequests={stats.totalRequests}
                     approvedRequests={stats.approvedRequests}
