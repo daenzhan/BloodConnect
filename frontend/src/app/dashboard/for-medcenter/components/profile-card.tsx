@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { FileText, ChevronDown } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 
 interface ProfileCardProps {
     name: string
@@ -13,14 +14,36 @@ interface ProfileCardProps {
 
 export function ProfileCard({ name, location }: ProfileCardProps) {
     const [isOpen, setIsOpen] = useState(false)
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const medCenterId = searchParams.get('id')
 
     const initials = name
         ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
         : "MC"
 
+    const handleLogout = () => {
+        // Очистка localStorage и редирект на логин
+        localStorage.removeItem('user')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('token')
+        router.push('/login')
+    }
+
+    const handleSettings = () => {
+        router.push(`/dashboard/for-medcenter/settings?id=${medCenterId}`)
+        setIsOpen(false)
+    }
+
     return (
         <div className="flex items-center gap-4">
-
+            {/* Кнопка создания запроса */}
+            <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 rounded-xl px-5">
+                    <FileText className="w-4 h-4" />
+                    <span className="hidden sm:inline">Create Request</span>
+                </Button>
+            </Link>
 
             <div className="relative">
                 <button
@@ -42,16 +65,28 @@ export function ProfileCard({ name, location }: ProfileCardProps) {
                 {isOpen && (
                     <Card className="absolute right-0 top-full mt-2 w-48 p-2 rounded-xl shadow-lg border border-border z-50 animate-in fade-in zoom-in duration-200">
                         <div className="space-y-1">
-                            <Link href="/dashboard/for-medcenter/profile">
-                                <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors">
-                                    View Profile
-                                </button>
+                            {/* View Profile с ID */}
+                            <Link
+                                href={`/dashboard/for-medcenter/profile?id=${medCenterId}`}
+                                className="block w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                View profile
                             </Link>
-                            <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors">
+
+                            <button
+                                onClick={handleSettings}
+                                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
+                            >
                                 Settings
                             </button>
+
                             <hr className="my-1 border-border" />
-                            <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors text-destructive">
+
+                            <button
+                                onClick={handleLogout}
+                                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors text-destructive"
+                            >
                                 Logout
                             </button>
                         </div>
