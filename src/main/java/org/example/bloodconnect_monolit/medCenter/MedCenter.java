@@ -16,27 +16,32 @@ public class MedCenter {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "medcenter_id")
     private Long medCenterId;
 
     @OneToOne
-    @JoinColumn(name = "userId", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(name = "location", nullable = false)
     private String location;
 
-    @Column(nullable = false)
+    @Column(name = "phone", nullable = false)
     private String phone;
 
+    @Column(name = "license_file")
     private String licenseFile;
 
+    @Column(name = "director_full_name")
     private String directorFullName;
 
+    @Column(name = "specialization")
     private String specialization;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @PrePersist

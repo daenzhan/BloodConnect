@@ -72,9 +72,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/").permitAll()
                         .requestMatchers("/home").permitAll()
+                                .requestMatchers("/donor/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/donor/**").hasAnyRole("DONOR", "ADMIN")
+//                        .requestMatchers("/donor/**").hasAnyRole("DONOR", "ADMIN")
                         .requestMatchers("/blood-center/**").hasAnyRole("BLOOD_CENTER", "ADMIN")
                         .requestMatchers("/medical-center/**").hasAnyRole("MEDICAL_CENTER", "ADMIN")
                         .anyRequest().authenticated()

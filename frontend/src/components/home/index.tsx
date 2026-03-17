@@ -453,9 +453,7 @@ export default function HomePage() {
                     </div>
 
                     <div className="mt-8 border-t border-border pt-8 text-center">
-                        <p className="text-xs text-muted-foreground">
-                            {"© 2026 BloodConnect Blood Donation Center. All rights reserved."}
-                        </p>
+                       
                     </div>
                 </div>
             </footer>

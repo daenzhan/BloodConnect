@@ -28,4 +28,5 @@ public interface DonorRepository extends JpaRepository<Donor, Long> {
     List<Donor> findByHeightBetween(Double minHeight, Double maxHeight);
     List<Donor> findByGender(String gender);
     List<Donor> findByBirthDateBetween(LocalDate startDate, LocalDate endDate);
+
 }

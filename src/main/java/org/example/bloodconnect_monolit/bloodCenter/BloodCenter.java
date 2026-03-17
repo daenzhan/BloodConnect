@@ -15,30 +15,39 @@ import org.example.bloodconnect_monolit.user.User;
 public class BloodCenter {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "bloodcenter_id")
     private Long bloodCenterId;
 
     @OneToOne
-    @JoinColumn(name = "userId", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(nullable = false)
+    @@Column(name = "name", nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(name = "location", nullable = false)
     private String location;
 
     @Column(nullable = false)
     private String city;
 
+    @Column(name = "specialization")
     private String specialization;
 
+    @Column(name = "license_file")
     private String licenseFile;
 
+    @Column(name = "director_full_name")
     private String directorFullName;
 
+    @Column(name = "latitude")
     private Double latitude;
 
+    @Column(name = "longitude")
     private Double longitude;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     @OneToOne(mappedBy = "bloodCenter")
     private BloodReserve bloodReserve;

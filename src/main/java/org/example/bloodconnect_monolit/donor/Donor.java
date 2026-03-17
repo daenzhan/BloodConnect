@@ -17,16 +17,17 @@ public class Donor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "donor_id")
     private Long donorId;
 
     @OneToOne
-    @JoinColumn(name = "userId", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(nullable = false)
+    @Column(name = "full_name", nullable = false)
     private String fullName;
 
-    @Column(nullable = false)
+    @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
 
     @Column(nullable = false, unique = true, length = 12)
@@ -38,8 +39,10 @@ public class Donor {
     @Column(nullable = false)
     private Double height;
 
+    @Column(name = "blood_group")
     private String bloodGroup;
 
+    @Column(name = "rhesus_factor")
     private String rhesusFactor;
 
     @Column(nullable = false)
@@ -51,16 +54,20 @@ public class Donor {
     @Column(nullable = false)
     private String gender;
 
+    @Column(name = "last_donation_date")
     private LocalDate lastDonationDate;
 
+    @Column(name = "donation_count")
     private Integer donationCount;
 
     private Integer rating;
 
     private Integer points;
 
+    @Column(name = "donor_status")
     private String donorStatus;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @PrePersist
