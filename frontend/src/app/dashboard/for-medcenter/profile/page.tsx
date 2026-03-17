@@ -5,9 +5,10 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Building2, MapPin, Phone, FileText, Save, Edit2, Calendar } from "lucide-react"
+import { User, Building2, MapPin, Phone, FileText, Save, Edit2, Calendar, ArrowLeft } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 
-// Matches MedCenter.java entity
 interface MedCenterProfile {
     medCenterId: number
     name: string
@@ -24,53 +25,63 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
     const [editedProfile, setEditedProfile] = useState<Partial<MedCenterProfile>>({})
 
-    // TODO: Get medCenterId from session/JWT token
-    const medCenterId = 1
+    const searchParams = useSearchParams()
+    const router = useRouter()
+    const medCenterId = searchParams.get('id')
 
     useEffect(() => {
+        if (!medCenterId) {
+            setError("Medical Center ID not provided in URL")
+            setIsLoading(false)
+            return
+        }
+
         const fetchProfile = async () => {
             try {
-                // Fetch med center profile from backend
-                const response = await fetch(`http://localhost:8080/medcenter/${medCenterId}/info`)
+                console.log("Fetching profile for ID:", medCenterId)
+
+                const response = await fetch(`http://localhost:8080/medcenter/${medCenterId}`)
+
+                console.log("Response status:", response.status)
+
                 if (response.ok) {
                     const data: MedCenterProfile = await response.json()
+                    console.log("Profile data received:", data)
                     setProfile(data)
                     setEditedProfile(data)
+                    setError(null)
+                } else if (response.status === 404) {
+                    setError(`Medical center with ID ${medCenterId} not found`)
+                } else {
+                    setError(`Failed to fetch profile: ${response.status}`)
                 }
             } catch (error) {
                 console.error("Error fetching profile:", error)
-                // Fallback to mock data matching MedCenter.java entity
-                const mockProfile: MedCenterProfile = {
-                    medCenterId: 1,
-                    name: "City General Hospital",
-                    location: "123 Medical Center Dr, Almaty",
-                    phone: "+7 (727) 123-4567",
-                    licenseFile: "license_12345.pdf",
-                    directorFullName: "Dr. Sarah Johnson",
-                    specialization: "General Medicine",
-                    createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
-                }
-                setProfile(mockProfile)
-                setEditedProfile(mockProfile)
+                setError("Network error. Please check if backend is running.")
             } finally {
                 setIsLoading(false)
             }
         }
 
-        fetchProfile()
+        if (medCenterId) {
+            fetchProfile()
+        }
     }, [medCenterId])
 
     const handleSave = async () => {
         setIsSaving(true)
+        setError(null)
+
         try {
-            // PUT to update med center profile
-            const response = await fetch(`http://localhost:8080/medcenter/${medCenterId}/update`, {
+            console.log("Updating profile for ID:", medCenterId)
+
+            const response = await fetch(`http://localhost:8080/medcenter/update/${medCenterId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json"
-                    // TODO: Add Authorization header with JWT token
                 },
                 body: JSON.stringify({
                     name: editedProfile.name,
@@ -83,16 +94,16 @@ export default function ProfilePage() {
 
             if (response.ok) {
                 const updatedData = await response.json()
+                console.log("Updated data:", updatedData)
                 setProfile(updatedData)
                 setIsEditing(false)
+                setError(null)
             } else {
-                throw new Error("Failed to update profile")
+                throw new Error(`Failed to update profile: ${response.status}`)
             }
         } catch (error) {
             console.error("Error saving profile:", error)
-            // For demo, just update locally
-            setProfile(editedProfile as MedCenterProfile)
-            setIsEditing(false)
+            setError("Failed to save changes. Please try again.")
         } finally {
             setIsSaving(false)
         }
@@ -118,22 +129,40 @@ export default function ProfilePage() {
         )
     }
 
-    if (!profile) {
+    if (error || !profile) {
         return (
-            <div className="p-8 text-destructive">Error loading profile</div>
+            <div className="p-8 text-center">
+                <p className="text-destructive mb-4">{error || "Profile not found"}</p>
+                <Button
+                    onClick={() => router.back()}
+                    className="bg-primary hover:bg-primary/90 rounded-xl"
+                >
+                    Go Back
+                </Button>
+            </div>
         )
     }
 
     return (
         <div className="max-w-2xl mx-auto">
+            <div className="mb-6">
+                <Link
+                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Dashboard
+                </Link>
+            </div>
+
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                         <User className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">Profile</h1>
-                        <p className="text-muted-foreground">Manage your medical center information</p>
+                        <h1 className="text-2xl font-bold text-foreground">Medical Center Profile</h1>
+                        <p className="text-muted-foreground">ID: {profile.medCenterId}</p>
                     </div>
                 </div>
                 {!isEditing ? (
@@ -153,6 +182,7 @@ export default function ProfilePage() {
                             onClick={() => {
                                 setIsEditing(false)
                                 setEditedProfile(profile)
+                                setError(null)
                             }}
                         >
                             Cancel
@@ -163,11 +193,16 @@ export default function ProfilePage() {
                             disabled={isSaving}
                         >
                             {isSaving ? (
-                                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                                <>
+                                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                                    Saving...
+                                </>
                             ) : (
-                                <Save className="w-4 h-4" />
+                                <>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save Changes
+                                </>
                             )}
-                            Save Changes
                         </Button>
                     </div>
                 )}

@@ -9,7 +9,16 @@ import java.util.List;
 @Repository
 public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long> {
 
-    // Запрос для получения всех заявок конкретного медцентра
-    @Query("SELECT r FROM BloodRequest r WHERE r.medCenter.medCenterId = :id")
-    List<BloodRequest> findByMedCenterId(@Param("id") Long id);
+    // Метод для поиска по ID медцентра
+    List<BloodRequest> findByMedCenter_MedCenterId(Long medCenterId);
+
+    // Альтернативный метод с JPQL
+    @Query("SELECT br FROM BloodRequest br WHERE br.medCenter.medCenterId = :medCenterId")
+    List<BloodRequest> findByMedCenterId(@Param("medCenterId") Long medCenterId);
+
+    // Поиск по статусу
+    List<BloodRequest> findByStatus(String status);
+
+    // Поиск по медцентру и статусу
+    List<BloodRequest> findByMedCenter_MedCenterIdAndStatus(Long medCenterId, String status);
 }

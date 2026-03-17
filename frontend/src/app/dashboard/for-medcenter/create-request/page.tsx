@@ -13,16 +13,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    RadioGroup,
+    RadioGroupItem,
+} from "@/components/ui/radio-group"
 import { FileText, ArrowLeft, CheckCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
-// Matches BloodRequest.java entity fields
 const bloodGroups = ["A", "B", "AB", "O"]
+
+// Rhesus factors as Positive/Negative
 const rhesusFactors = [
-    { value: "+", label: "Positive (+)" },
-    { value: "-", label: "Negative (-)" }
+    { value: "Positive", label: "Positive (+)" },
+    { value: "Negative", label: "Negative (-)" }
 ]
+
 const componentTypes = [
     { value: "WHOLE_BLOOD", label: "Whole Blood" },
     { value: "PLASMA", label: "Plasma" },
@@ -30,6 +36,7 @@ const componentTypes = [
     { value: "RED_CELLS", label: "Red Blood Cells" },
     { value: "CRYOPRECIPITATE", label: "Cryoprecipitate" }
 ]
+
 const volumeOptions = [
     { value: "200ml", label: "200 ml" },
     { value: "250ml", label: "250 ml" },
@@ -39,13 +46,23 @@ const volumeOptions = [
     { value: "500ml", label: "500 ml" }
 ]
 
+const unitOptions = [
+    { value: "ml", label: "Milliliters (ml)" },
+    { value: "L", label: "Liters (L)" }
+]
+
 export default function CreateRequestPage() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const medCenterId = searchParams.get('id')
+
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [isCustomVolume, setIsCustomVolume] = useState(false)
+    const [customVolumeValue, setCustomVolumeValue] = useState("")
+    const [customVolumeUnit, setCustomVolumeUnit] = useState("ml")
 
-    // Form data matches BloodRequest.java entity
     const [formData, setFormData] = useState({
         componentType: "",
         bloodGroup: "",
@@ -60,23 +77,44 @@ export default function CreateRequestPage() {
         setIsSubmitting(true)
         setError(null)
 
+        if (!medCenterId) {
+            setError("Medical Center ID not found")
+            setIsSubmitting(false)
+            return
+        }
+
+        // Determine final volume
+        let finalVolume = formData.volume
+        if (isCustomVolume && customVolumeValue) {
+            finalVolume = `${customVolumeValue}${customVolumeUnit}`
+        }
+
+        if (!finalVolume) {
+            setError("Please select or enter a volume")
+            setIsSubmitting(false)
+            return
+        }
+
         try {
-            // POST to /create/request endpoint
-            const response = await fetch("http://localhost:8080/create/request", {
+            const requestData = {
+                componentType: formData.componentType,
+                bloodGroup: formData.bloodGroup,
+                rhesusFactor: formData.rhesusFactor,
+                volume: finalVolume,
+                deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+                comment: formData.comment || null,
+                status: "PENDING",
+                medCenter: { medCenterId: parseInt(medCenterId) }
+            }
+
+            console.log("Submitting request:", requestData)
+
+            const response = await fetch("http://localhost:8080/blood-requests/create", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
-                    // TODO: Add Authorization header with JWT token
                 },
-                body: JSON.stringify({
-                    componentType: formData.componentType,
-                    bloodGroup: formData.bloodGroup,
-                    rhesusFactor: formData.rhesusFactor,
-                    volume: formData.volume,
-                    deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-                    comment: formData.comment || null,
-                    status: "PENDING"
-                }),
+                body: JSON.stringify(requestData),
             })
 
             if (!response.ok) {
@@ -85,7 +123,7 @@ export default function CreateRequestPage() {
 
             setIsSuccess(true)
             setTimeout(() => {
-                router.push("/dashboard/for-medcenter/my-requests")
+                router.push(`/dashboard/for-medcenter/my-requests?id=${medCenterId}`)
             }, 2000)
         } catch (err) {
             console.error("Error creating request:", err)
@@ -104,9 +142,9 @@ export default function CreateRequestPage() {
                     </div>
                     <h2 className="text-xl font-bold text-foreground mb-2">Request Created!</h2>
                     <p className="text-muted-foreground mb-4">
-                        Your blood request has been submitted successfully. You will be redirected to your requests page.
+                        Your blood request has been submitted successfully.
                     </p>
-                    <Link href="/dashboard/for-medcenter/my-requests">
+                    <Link href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
                             View My Requests
                         </Button>
@@ -117,10 +155,10 @@ export default function CreateRequestPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto p-4">
             <div className="mb-6">
                 <Link
-                    href="/dashboard/for-medcenter"
+                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -139,18 +177,26 @@ export default function CreateRequestPage() {
 
             <Card className="p-6 rounded-2xl border border-border">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Component Type */}
                     <div className="space-y-2">
-                        <Label htmlFor="componentType">Component Type *</Label>
+                        <Label htmlFor="componentType" className="text-sm font-medium">
+                            Component Type <span className="text-red-500">*</span>
+                        </Label>
                         <Select
                             value={formData.componentType}
                             onValueChange={(value) => setFormData({ ...formData, componentType: value })}
+                            required
                         >
-                            <SelectTrigger id="componentType">
+                            <SelectTrigger id="componentType" className="w-full h-11 bg-white">
                                 <SelectValue placeholder="Select blood component" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
                                 {componentTypes.map((type) => (
-                                    <SelectItem key={type.value} value={type.value}>
+                                    <SelectItem
+                                        key={type.value}
+                                        value={type.value}
+                                        className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
+                                    >
                                         {type.label}
                                     </SelectItem>
                                 ))}
@@ -158,19 +204,27 @@ export default function CreateRequestPage() {
                         </Select>
                     </div>
 
+                    {/* Blood Group and Rhesus Factor */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="bloodGroup">Blood Group *</Label>
+                            <Label htmlFor="bloodGroup" className="text-sm font-medium">
+                                Blood Group <span className="text-red-500">*</span>
+                            </Label>
                             <Select
                                 value={formData.bloodGroup}
                                 onValueChange={(value) => setFormData({ ...formData, bloodGroup: value })}
+                                required
                             >
-                                <SelectTrigger id="bloodGroup">
+                                <SelectTrigger id="bloodGroup" className="w-full h-11 bg-white">
                                     <SelectValue placeholder="Select blood group" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="bg-white border border-gray-200 shadow-lg">
                                     {bloodGroups.map((group) => (
-                                        <SelectItem key={group} value={group}>
+                                        <SelectItem
+                                            key={group}
+                                            value={group}
+                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
+                                        >
                                             {group}
                                         </SelectItem>
                                     ))}
@@ -179,17 +233,24 @@ export default function CreateRequestPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="rhesusFactor">Rhesus Factor *</Label>
+                            <Label htmlFor="rhesusFactor" className="text-sm font-medium">
+                                Rhesus Factor <span className="text-red-500">*</span>
+                            </Label>
                             <Select
                                 value={formData.rhesusFactor}
                                 onValueChange={(value) => setFormData({ ...formData, rhesusFactor: value })}
+                                required
                             >
-                                <SelectTrigger id="rhesusFactor">
+                                <SelectTrigger id="rhesusFactor" className="w-full h-11 bg-white">
                                     <SelectValue placeholder="Select Rh factor" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="bg-white border border-gray-200 shadow-lg">
                                     {rhesusFactors.map((rh) => (
-                                        <SelectItem key={rh.value} value={rh.value}>
+                                        <SelectItem
+                                            key={rh.value}
+                                            value={rh.value}
+                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
+                                        >
                                             {rh.label}
                                         </SelectItem>
                                     ))}
@@ -198,80 +259,164 @@ export default function CreateRequestPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="volume">Volume *</Label>
+                    {/* Volume with Custom Input Option */}
+                    <div className="space-y-4">
+                        <Label className="text-sm font-medium">
+                            Volume <span className="text-red-500">*</span>
+                        </Label>
+
+                        <div className="flex gap-2 mb-2">
+                            <Button
+                                type="button"
+                                variant={!isCustomVolume ? "default" : "outline"}
+                                className={`flex-1 h-11 ${!isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
+                                onClick={() => {
+                                    setIsCustomVolume(false)
+                                    setCustomVolumeValue("")
+                                }}
+                            >
+                                Select from list
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={isCustomVolume ? "default" : "outline"}
+                                className={`flex-1 h-11 ${isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
+                                onClick={() => setIsCustomVolume(true)}
+                            >
+                                Enter custom
+                            </Button>
+                        </div>
+
+                        {!isCustomVolume ? (
                             <Select
                                 value={formData.volume}
                                 onValueChange={(value) => setFormData({ ...formData, volume: value })}
+                                required={!isCustomVolume}
                             >
-                                <SelectTrigger id="volume">
+                                <SelectTrigger id="volume" className="w-full h-11 bg-white">
                                     <SelectValue placeholder="Select volume" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
                                     {volumeOptions.map((vol) => (
-                                        <SelectItem key={vol.value} value={vol.value}>
+                                        <SelectItem
+                                            key={vol.value}
+                                            value={vol.value}
+                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
+                                        >
                                             {vol.label}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="flex gap-3">
+                                    <div className="flex-1">
+                                        <Input
+                                            id="customVolume"
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            placeholder="Enter amount"
+                                            value={customVolumeValue}
+                                            onChange={(e) => {
+                                                setCustomVolumeValue(e.target.value)
+                                                setFormData({ ...formData, volume: "" })
+                                            }}
+                                            className="w-full h-11 px-4 border border-input bg-white rounded-xl"
+                                            required={isCustomVolume}
+                                        />
+                                    </div>
+                                    <div className="w-32">
+                                        <Select
+                                            value={customVolumeUnit}
+                                            onValueChange={setCustomVolumeUnit}
+                                        >
+                                            <SelectTrigger className="w-full h-11 bg-white">
+                                                <SelectValue placeholder="Unit" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                                                {unitOptions.map((unit) => (
+                                                    <SelectItem
+                                                        key={unit.value}
+                                                        value={unit.value}
+                                                        className="cursor-pointer py-3 hover:bg-gray-100 bg-white text-gray-900"
+                                                    >
+                                                        {unit.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="deadline">Deadline</Label>
-                            <Input
-                                id="deadline"
-                                type="datetime-local"
-                                value={formData.deadline}
-                                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                            />
-                        </div>
+                                <div className="flex gap-3 text-sm text-muted-foreground">
+                                    <span>Examples:</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">450ml</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">0.5L</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">1L</span>
+                                    <span className="bg-gray-100 px-2 py-1 rounded">750ml</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
+                    {/* Deadline */}
                     <div className="space-y-2">
-                        <Label htmlFor="comment">Additional Comments</Label>
+                        <Label htmlFor="deadline" className="text-sm font-medium">
+                            Deadline <span className="text-gray-400 text-xs">(Optional)</span>
+                        </Label>
+                        <Input
+                            id="deadline"
+                            type="datetime-local"
+                            value={formData.deadline}
+                            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                            className="rounded-xl w-full h-11 px-4 border border-input bg-white"
+                        />
+                    </div>
+
+                    {/* Comments */}
+                    <div className="space-y-2">
+                        <Label htmlFor="comment" className="text-sm font-medium">
+                            Additional Comments <span className="text-gray-400 text-xs">(Optional)</span>
+                        </Label>
                         <Textarea
                             id="comment"
                             placeholder="Any additional information about the request..."
                             rows={4}
                             value={formData.comment}
                             onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                            className="rounded-xl w-full resize-none p-4 border border-input bg-white"
                         />
                     </div>
 
                     {error && (
-                        <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm">
+                        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
                             {error}
                         </div>
                     )}
 
-                    <div className="flex gap-4">
-                        <Link href="/dashboard/for-medcenter" className="flex-1">
+                    {/* Buttons */}
+                    <div className="flex gap-4 pt-4">
+                        <Link href={`/dashboard/for-medcenter?id=${medCenterId}`} className="flex-1">
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="w-full rounded-xl"
+                                className="w-full rounded-xl h-12 border-2 hover:bg-gray-50 transition-all bg-white"
                             >
                                 Cancel
                             </Button>
                         </Link>
                         <Button
                             type="submit"
-                            className="flex-1 bg-primary hover:bg-primary/90 rounded-xl"
-                            disabled={
-                                isSubmitting ||
-                                !formData.componentType ||
-                                !formData.bloodGroup ||
-                                !formData.rhesusFactor ||
-                                !formData.volume
-                            }
+                            className="flex-1 bg-primary hover:bg-primary/90 rounded-xl h-12 transition-all text-white"
+                            disabled={isSubmitting || !formData.componentType || !formData.bloodGroup || !formData.rhesusFactor || (!formData.volume && !customVolumeValue)}
                         >
                             {isSubmitting ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                                <span className="flex items-center justify-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                     Submitting...
-                                </>
+                                </span>
                             ) : (
                                 "Submit Request"
                             )}

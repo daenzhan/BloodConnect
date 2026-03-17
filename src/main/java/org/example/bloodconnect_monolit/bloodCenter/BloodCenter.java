@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
 import org.example.bloodconnect_monolit.user.User;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "bloodcenters")
 @Data
@@ -22,7 +24,7 @@ public class BloodCenter {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @@Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Column(name = "location", nullable = false)

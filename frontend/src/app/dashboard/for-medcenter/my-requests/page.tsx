@@ -11,10 +11,26 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { ClipboardList, Plus, Clock, CheckCircle, XCircle, AlertCircle, Filter } from "lucide-react"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ClipboardList, Plus, Clock, CheckCircle, XCircle, AlertCircle, Filter, MoreVertical, Edit, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 
-// Matches BloodRequest.java entity
 interface BloodRequest {
     bloodRequestId: number
     componentType: string
@@ -37,23 +53,28 @@ interface BloodRequest {
 const statusConfig = {
     PENDING: {
         icon: Clock,
-        color: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+        color: "bg-yellow-100 text-yellow-700 border-yellow-200",
         label: "Pending"
     },
     APPROVED: {
         icon: CheckCircle,
-        color: "bg-chart-2/10 text-chart-2 border-chart-2/20",
+        color: "bg-green-100 text-green-700 border-green-200",
         label: "Approved"
     },
     REJECTED: {
         icon: XCircle,
-        color: "bg-destructive/10 text-destructive border-destructive/20",
+        color: "bg-red-100 text-red-700 border-red-200",
         label: "Rejected"
     },
     IN_PROGRESS: {
         icon: AlertCircle,
-        color: "bg-chart-3/10 text-chart-3 border-chart-3/20",
+        color: "bg-blue-100 text-blue-700 border-blue-200",
         label: "In Progress"
+    },
+    COMPLETED: {
+        icon: CheckCircle,
+        color: "bg-purple-100 text-purple-700 border-purple-200",
+        label: "Completed"
     }
 }
 
@@ -65,88 +86,97 @@ const componentTypeLabels: Record<string, string> = {
     CRYOPRECIPITATE: "Cryoprecipitate"
 }
 
+// Функция для преобразования rhesusFactor
+const formatRhesusFactor = (rhesusFactor: string): string => {
+    if (!rhesusFactor) return "";
+
+    const lower = rhesusFactor.toLowerCase();
+    if (lower.includes("positive") || lower === "+") {
+        return "+";
+    } else if (lower.includes("negative") || lower === "-") {
+        return "-";
+    }
+    return rhesusFactor;
+};
+
 export default function MyRequestsPage() {
     const [requests, setRequests] = useState<BloodRequest[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [statusFilter, setStatusFilter] = useState<string>("ALL")
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
+    const searchParams = useSearchParams()
+    const router = useRouter()
+    const medCenterId = searchParams.get('id') || "1"
+
+    // Fetch requests
     useEffect(() => {
         const fetchRequests = async () => {
             try {
-                const response = await fetch("http://localhost:8080/show/own/requests", {
-                    headers: {
-                        "Content-Type": "application/json"
-                        // TODO: Add Authorization header with JWT token
-                    }
-                })
+                const response = await fetch(`http://localhost:8080/blood-requests/medcenter/${medCenterId}`)
 
                 if (response.ok) {
                     const data = await response.json()
                     setRequests(data)
+                } else {
+                    console.error("Failed to fetch requests")
                 }
             } catch (error) {
                 console.error("Error fetching requests:", error)
-                // Fallback to mock data for development
-                setRequests([
-                    {
-                        bloodRequestId: 1,
-                        componentType: "WHOLE_BLOOD",
-                        bloodGroup: "A",
-                        rhesusFactor: "+",
-                        volume: "450ml",
-                        deadline: new Date().toISOString(),
-                        status: "PENDING",
-                        comment: "Urgent surgery scheduled"
-                    },
-                    {
-                        bloodRequestId: 2,
-                        componentType: "PLASMA",
-                        bloodGroup: "O",
-                        rhesusFactor: "-",
-                        volume: "300ml",
-                        deadline: new Date(Date.now() - 86400000).toISOString(),
-                        status: "APPROVED",
-                        bloodCenter: {
-                            bloodCenterId: 1,
-                            name: "City Blood Bank"
-                        }
-                    },
-                    {
-                        bloodRequestId: 3,
-                        componentType: "PLATELETS",
-                        bloodGroup: "B",
-                        rhesusFactor: "+",
-                        volume: "200ml",
-                        deadline: new Date(Date.now() - 172800000).toISOString(),
-                        status: "APPROVED"
-                    },
-                    {
-                        bloodRequestId: 4,
-                        componentType: "RED_CELLS",
-                        bloodGroup: "AB",
-                        rhesusFactor: "+",
-                        volume: "350ml",
-                        deadline: new Date(Date.now() - 259200000).toISOString(),
-                        status: "REJECTED",
-                        comment: "Insufficient stock available"
-                    },
-                    {
-                        bloodRequestId: 5,
-                        componentType: "WHOLE_BLOOD",
-                        bloodGroup: "O",
-                        rhesusFactor: "+",
-                        volume: "450ml",
-                        deadline: new Date(Date.now() - 345600000).toISOString(),
-                        status: "IN_PROGRESS"
-                    }
-                ])
             } finally {
                 setIsLoading(false)
             }
         }
 
         fetchRequests()
-    }, [])
+    }, [medCenterId])
+
+    // Delete request
+    const handleDelete = async () => {
+        if (!selectedRequest) return
+
+        setIsDeleting(true)
+        try {
+            const response = await fetch(`http://localhost:8080/blood-requests/${selectedRequest.bloodRequestId}`, {
+                method: "DELETE"
+            })
+
+            if (response.ok) {
+                // Remove from list
+                setRequests(requests.filter(r => r.bloodRequestId !== selectedRequest.bloodRequestId))
+                setDeleteDialogOpen(false)
+                setSelectedRequest(null)
+            } else {
+                console.error("Failed to delete request")
+            }
+        } catch (error) {
+            console.error("Error deleting request:", error)
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
+    // Update request status
+    const handleStatusUpdate = async (requestId: number, newStatus: string) => {
+        try {
+            const response = await fetch(`http://localhost:8080/blood-requests/${requestId}/status?status=${newStatus}`, {
+                method: "PUT"
+            })
+
+            if (response.ok) {
+                // Update local state
+                setRequests(requests.map(r =>
+                    r.bloodRequestId === requestId
+                        ? { ...r, status: newStatus }
+                        : r
+                ))
+            }
+        } catch (error) {
+            console.error("Error updating status:", error)
+        }
+    }
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return "No deadline"
@@ -161,7 +191,8 @@ export default function MyRequestsPage() {
     }
 
     const getBloodTypeDisplay = (request: BloodRequest) => {
-        return `${request.bloodGroup}${request.rhesusFactor}`
+        const rhesusSymbol = formatRhesusFactor(request.rhesusFactor);
+        return `${request.bloodGroup}${rhesusSymbol}`;
     }
 
     const filteredRequests = statusFilter === "ALL"
@@ -181,6 +212,7 @@ export default function MyRequestsPage() {
 
     return (
         <div>
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -189,9 +221,10 @@ export default function MyRequestsPage() {
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">My Requests</h1>
                         <p className="text-muted-foreground">View and manage your blood requests</p>
+                        <p className="text-xs text-muted-foreground mt-1">Center ID: {medCenterId}</p>
                     </div>
                 </div>
-                <Link href="/dashboard/for-medcenter/create-request">
+                <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
                     <Button className="bg-primary hover:bg-primary/90 gap-2 rounded-xl">
                         <Plus className="w-4 h-4" />
                         New Request
@@ -199,21 +232,23 @@ export default function MyRequestsPage() {
                 </Link>
             </div>
 
+            {/* Filters */}
             <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Filter:</span>
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-40 bg-white">
                         <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL">All Requests</SelectItem>
-                        <SelectItem value="PENDING">Pending</SelectItem>
-                        <SelectItem value="APPROVED">Approved</SelectItem>
-                        <SelectItem value="REJECTED">Rejected</SelectItem>
-                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                        <SelectItem value="ALL" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">All Requests</SelectItem>
+                        <SelectItem value="PENDING" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Pending</SelectItem>
+                        <SelectItem value="APPROVED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Approved</SelectItem>
+                        <SelectItem value="REJECTED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Rejected</SelectItem>
+                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">In Progress</SelectItem>
+                        <SelectItem value="COMPLETED" className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900">Completed</SelectItem>
                     </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">
@@ -221,6 +256,7 @@ export default function MyRequestsPage() {
                 </span>
             </div>
 
+            {/* Requests List */}
             {filteredRequests.length === 0 ? (
                 <Card className="p-8 text-center rounded-2xl border border-border">
                     <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -230,7 +266,7 @@ export default function MyRequestsPage() {
                             ? "You haven't created any blood requests yet."
                             : `No ${statusFilter.toLowerCase()} requests found.`}
                     </p>
-                    <Link href="/dashboard/for-medcenter/create-request">
+                    <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
                             Create Your First Request
                         </Button>
@@ -243,45 +279,147 @@ export default function MyRequestsPage() {
                         const StatusIcon = status.icon
                         const bloodType = getBloodTypeDisplay(request)
                         const componentLabel = componentTypeLabels[request.componentType] || request.componentType
+                        const originalRhesus = request.rhesusFactor;
 
                         return (
-                            <Card key={request.bloodRequestId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all">
+                            <Card key={request.bloodRequestId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all relative group">
                                 <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-4">
+                                    <div className="flex items-start gap-4 flex-1">
+                                        {/* Blood Type Icon */}
                                         <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
                                             <span className="text-lg font-bold text-primary">{bloodType}</span>
                                         </div>
-                                        <div>
+
+                                        {/* Request Details */}
+                                        <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <h3 className="font-semibold text-foreground">
                                                     {request.volume} of {bloodType} ({componentLabel})
                                                 </h3>
+                                                {/* Quick Status Update Dropdown */}
+                                                <Select
+                                                    value={request.status}
+                                                    onValueChange={(value) => handleStatusUpdate(request.bloodRequestId, value)}
+                                                >
+                                                    <SelectTrigger className="w-32 h-7 text-xs bg-white">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                                                        <SelectItem value="PENDING" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Pending</SelectItem>
+                                                        <SelectItem value="APPROVED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Approved</SelectItem>
+                                                        <SelectItem value="IN_PROGRESS" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">In Progress</SelectItem>
+                                                        <SelectItem value="COMPLETED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Completed</SelectItem>
+                                                        <SelectItem value="REJECTED" className="cursor-pointer py-1.5 hover:bg-gray-100 bg-white">Rejected</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
+
                                             <p className="text-sm text-muted-foreground mb-2">
                                                 Request #{request.bloodRequestId} • Deadline: {formatDate(request.deadline)}
+                                                {originalRhesus && originalRhesus !== bloodType.slice(1) && (
+                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                        (Original: {originalRhesus})
+                                                    </span>
+                                                )}
                                             </p>
+
                                             {request.bloodCenter && (
-                                                <p className="text-sm text-chart-2">
+                                                <p className="text-sm text-green-600 mb-1">
                                                     Assigned to: {request.bloodCenter.name}
                                                 </p>
                                             )}
+
                                             {request.comment && (
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Note: {request.comment}
+                                                <p className="text-sm text-muted-foreground mt-1 bg-muted/50 p-2 rounded-lg">
+                                                    <span className="font-medium">Note:</span> {request.comment}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
-                                    <Badge variant="outline" className={`${status.color} flex items-center gap-1`}>
-                                        <StatusIcon className="w-3 h-3" />
-                                        {status.label}
-                                    </Badge>
+
+                                    {/* Status Badge and Actions */}
+                                    <div className="flex items-start gap-2">
+                                        <Badge variant="outline" className={`${status.color} flex items-center gap-1 px-3 py-1`}>
+                                            <StatusIcon className="w-3 h-3" />
+                                            {status.label}
+                                        </Badge>
+
+                                        {/* Actions Dropdown */}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 bg-white hover:bg-gray-100">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg">
+                                                <DropdownMenuItem
+                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/view?id=${medCenterId}`)}
+                                                    className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
+                                                >
+                                                    <Eye className="w-4 h-4 mr-2" />
+                                                    View Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/edit?id=${medCenterId}`)}
+                                                    className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
+                                                >
+                                                    <Edit className="w-4 h-4 mr-2" />
+                                                    Edit Request
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-red-600"
+                                                    onClick={() => {
+                                                        setSelectedRequest(request)
+                                                        setDeleteDialogOpen(true)
+                                                    }}
+                                                >
+                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                    Delete Request
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
                             </Card>
                         )
                     })}
                 </div>
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent className="bg-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the blood request
+                            {selectedRequest && (
+                                <>
+                                    {" "}for {selectedRequest.bloodGroup}
+                                    {formatRhesusFactor(selectedRequest.rhesusFactor)} ({selectedRequest.volume})
+                                </>
+                            )}.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting} className="bg-white hover:bg-gray-100">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { WelcomeCard } from "./components/welcome-card"
 import { QuickActions } from "./components/quick-actions"
 import { RequestStats } from "./components/request-stats"
@@ -8,7 +9,6 @@ import { RecentRequests } from "./components/recent-requests"
 import { CenterInfoCard } from "./components/center-info-card"
 import { ProfileCard } from "./components/profile-card"
 
-// Matches MedCenter.java entity
 interface MedCenterData {
     medCenterId: number
     name: string
@@ -20,8 +20,7 @@ interface MedCenterData {
     createdAt?: string
 }
 
-// Matches BloodRequest.java entity
-interface BloodRequestData {
+interface BloodRequest {
     bloodRequestId: number
     componentType: string
     bloodGroup: string
@@ -30,128 +29,69 @@ interface BloodRequestData {
     deadline?: string
     status: string
     comment?: string
-    medCenter?: MedCenterData
+    medCenter?: {
+        medCenterId: number
+        name: string
+    }
     bloodCenter?: {
         bloodCenterId: number
         name: string
     }
 }
 
-interface DashboardData {
-    medCenter: MedCenterData
-    requests: BloodRequestData[]
-    stats: {
-        totalRequests: number
-        approvedRequests: number
-        pendingRequests: number
-        rejectedRequests: number
-    }
-}
-
 export default function MedCenterDashboard() {
     const [currentDate] = useState(new Date())
-    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+    const [medCenter, setMedCenter] = useState<MedCenterData | null>(null)
+    const [requests, setRequests] = useState<BloodRequest[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
-    // TODO: Get medCenterId from session/JWT token
-    const medCenterId = 1
+    const searchParams = useSearchParams()
+    const medCenterId = searchParams.get('id')
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            // Mock data for development / fallback
-            const mockData: DashboardData = {
-                medCenter: {
-                    medCenterId: 1,
-                    name: "City General Hospital",
-                    location: "123 Medical Center Dr, Almaty",
-                    phone: "+7 (727) 123-4567",
-                    specialization: "General Medicine",
-                    directorFullName: "Dr. Sarah Johnson"
-                },
-                requests: [
-                    {
-                        bloodRequestId: 1,
-                        componentType: "Whole Blood",
-                        bloodGroup: "A",
-                        rhesusFactor: "+",
-                        volume: "450ml",
-                        status: "PENDING",
-                        deadline: new Date().toISOString()
-                    },
-                    {
-                        bloodRequestId: 2,
-                        componentType: "Plasma",
-                        bloodGroup: "O",
-                        rhesusFactor: "-",
-                        volume: "300ml",
-                        status: "APPROVED",
-                        deadline: new Date(Date.now() - 86400000).toISOString()
-                    },
-                    {
-                        bloodRequestId: 3,
-                        componentType: "Platelets",
-                        bloodGroup: "B",
-                        rhesusFactor: "+",
-                        volume: "200ml",
-                        status: "APPROVED",
-                        deadline: new Date(Date.now() - 172800000).toISOString()
-                    }
-                ],
-                stats: {
-                    totalRequests: 15,
-                    approvedRequests: 10,
-                    pendingRequests: 3,
-                    rejectedRequests: 2
-                }
-            }
-
-            try {
-                // Try to fetch from backend
-                const controller = new AbortController()
-                const timeoutId = setTimeout(() => controller.abort(), 3000)
-
-                const centerResponse = await fetch(`http://localhost:8080/medcenter/${medCenterId}/info`, {
-                    signal: controller.signal
-                })
-                clearTimeout(timeoutId)
-
-                if (centerResponse.ok) {
-                    const centerData: MedCenterData = await centerResponse.json()
-
-                    // Fetch own requests
-                    const requestsResponse = await fetch(`http://localhost:8080/show/own/requests`, {
-                        headers: {
-                            "Content-Type": "application/json"
-                        }
-                    })
-
-                    let requestsData: BloodRequestData[] = []
-                    let stats = { totalRequests: 0, approvedRequests: 0, pendingRequests: 0, rejectedRequests: 0 }
-
-                    if (requestsResponse.ok) {
-                        requestsData = await requestsResponse.json()
-                        stats = {
-                            totalRequests: requestsData.length,
-                            approvedRequests: requestsData.filter(r => r.status === "APPROVED").length,
-                            pendingRequests: requestsData.filter(r => r.status === "PENDING").length,
-                            rejectedRequests: requestsData.filter(r => r.status === "REJECTED").length
-                        }
-                    }
-
-                    setDashboardData({ medCenter: centerData, requests: requestsData, stats })
-                    setIsLoading(false)
-                    return
-                }
-            } catch {
-                // Backend not available, use mock data silently
-            }
-
-            // Use mock data as fallback
-            setDashboardData(mockData)
+        if (!medCenterId) {
+            setError("Medical Center ID not provided in URL")
             setIsLoading(false)
+            return
         }
 
-        fetchDashboardData()
+        const fetchData = async () => {
+            try {
+                console.log("Fetching med center data for ID:", medCenterId)
+
+                const centerResponse = await fetch(`http://localhost:8080/medcenter/${medCenterId}`)
+
+                if (!centerResponse.ok) {
+                    throw new Error(`Failed to fetch medical center data: ${centerResponse.status}`)
+                }
+
+                const centerData = await centerResponse.json()
+                console.log("Center data received:", centerData)
+                setMedCenter(centerData)
+
+                const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${medCenterId}`)
+
+                if (requestsResponse.ok) {
+                    const requestsData = await requestsResponse.json()
+                    console.log("Requests received:", requestsData)
+                    setRequests(requestsData)
+                } else {
+                    console.log("No requests found or error fetching requests")
+                }
+
+                setError(null)
+            } catch (error) {
+                console.error("Error fetching data:", error)
+                setError("Failed to load dashboard data. Please try again later.")
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        if (medCenterId) {
+            fetchData()
+        }
     }, [medCenterId])
 
     const formatDate = (date: Date) => {
@@ -163,61 +103,87 @@ export default function MedCenterDashboard() {
         })
     }
 
+    const stats = {
+        totalRequests: requests.length,
+        approvedRequests: requests.filter(r => r.status === "APPROVED").length,
+        pendingRequests: requests.filter(r => r.status === "PENDING").length,
+        rejectedRequests: requests.filter(r => r.status === "REJECTED").length,
+        inProgressRequests: requests.filter(r => r.status === "IN_PROGRESS").length
+    }
+
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center text-foreground">
+            <div className="flex min-h-screen items-center justify-center">
                 <div className="text-center">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p>Loading dashboard...</p>
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading dashboard...</p>
                 </div>
             </div>
         )
     }
 
-    if (!dashboardData) {
+    if (error || !medCenter) {
         return (
-            <div className="p-8 text-destructive">
-                Error loading data
+            <div className="p-8 text-center">
+                <p className="text-destructive mb-4">{error || "Medical center not found"}</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                >
+                    Try Again
+                </button>
             </div>
         )
     }
 
     return (
-        <>
+        <div className="space-y-6">
             <header className="flex items-start justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-foreground">
-                        Hello, {dashboardData.medCenter.name}!
+                        Hello, {medCenter.name}!
                     </h1>
                     <p className="text-muted-foreground">{formatDate(currentDate)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Center ID: {medCenter.medCenterId} | URL ID: {medCenterId}
+                    </p>
                 </div>
                 <ProfileCard
-                    name={dashboardData.medCenter.name}
-                    location={dashboardData.medCenter.location}
+                    name={medCenter.name}
+                    location={medCenter.location}
                 />
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <WelcomeCard centerName={dashboardData.medCenter.name} />
+                <WelcomeCard centerName={medCenter.name} />
                 <CenterInfoCard
-                    name={dashboardData.medCenter.name}
-                    location={dashboardData.medCenter.location}
-                    phone={dashboardData.medCenter.phone}
-                    specialization={dashboardData.medCenter.specialization}
+                    name={medCenter.name}
+                    location={medCenter.location}
+                    phone={medCenter.phone}
+                    specialization={medCenter.specialization}
                 />
             </div>
 
             <QuickActions />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <RecentRequests requests={dashboardData.requests} />
+                <RecentRequests requests={requests} />
                 <RequestStats
-                    totalRequests={dashboardData.stats.totalRequests}
-                    approvedRequests={dashboardData.stats.approvedRequests}
-                    pendingRequests={dashboardData.stats.pendingRequests}
-                    rejectedRequests={dashboardData.stats.rejectedRequests}
+                    totalRequests={stats.totalRequests}
+                    approvedRequests={stats.approvedRequests}
+                    pendingRequests={stats.pendingRequests}
+                    rejectedRequests={stats.rejectedRequests}
+                    inProgressRequests={stats.inProgressRequests}
                 />
             </div>
-        </>
+
+            {requests.length === 0 && (
+                <div className="bg-muted/50 rounded-xl p-6 text-center">
+                    <p className="text-muted-foreground">
+                        No blood requests found. Click "Create Request" to create your first request.
+                    </p>
+                </div>
+            )}
+        </div>
     )
 }

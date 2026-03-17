@@ -4,16 +4,16 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MapPin, Phone, Clock, Search, ExternalLink, Building2 } from "lucide-react"
+import { MapPin, Search, ExternalLink, Building2, ArrowLeft } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 
-// Matches BloodCenter.java entity
 interface BloodCenter {
     bloodCenterId: number
     name: string
     location: string
     city: string
     specialization?: string
-    licenseFile?: string
     directorFullName?: string
     latitude?: number
     longitude?: number
@@ -24,10 +24,12 @@ export default function BloodCentersPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
 
+    const searchParams = useSearchParams()
+    const medCenterId = searchParams.get('id')
+
     useEffect(() => {
         const fetchCenters = async () => {
             try {
-                // Fetch blood centers from backend
                 const response = await fetch("http://localhost:8080/blood-centers")
                 if (response.ok) {
                     const data = await response.json()
@@ -35,49 +37,6 @@ export default function BloodCentersPage() {
                 }
             } catch (error) {
                 console.error("Error fetching blood centers:", error)
-                // Fallback to mock data matching BloodCenter.java entity
-                setCenters([
-                    {
-                        bloodCenterId: 1,
-                        name: "City Blood Bank",
-                        location: "123 Main Street",
-                        city: "Almaty",
-                        specialization: "General Blood Services",
-                        directorFullName: "Dr. Alex Kim",
-                        latitude: 43.2551,
-                        longitude: 76.9126
-                    },
-                    {
-                        bloodCenterId: 2,
-                        name: "Regional Blood Center",
-                        location: "456 Health Avenue",
-                        city: "Almaty",
-                        specialization: "Plasma Collection",
-                        directorFullName: "Dr. Marina Ivanova",
-                        latitude: 43.2380,
-                        longitude: 76.9450
-                    },
-                    {
-                        bloodCenterId: 3,
-                        name: "Central Hospital Blood Bank",
-                        location: "789 Medical Park",
-                        city: "Almaty",
-                        specialization: "Emergency Blood Services",
-                        directorFullName: "Dr. Nurlan Omarov",
-                        latitude: 43.2650,
-                        longitude: 76.9280
-                    },
-                    {
-                        bloodCenterId: 4,
-                        name: "National Blood Transfusion Center",
-                        location: "321 Healthcare Blvd",
-                        city: "Almaty",
-                        specialization: "Full Blood Services",
-                        directorFullName: "Dr. Aigul Sadvakasova",
-                        latitude: 43.2420,
-                        longitude: 76.9100
-                    }
-                ])
             } finally {
                 setIsLoading(false)
             }
@@ -117,6 +76,16 @@ export default function BloodCentersPage() {
 
     return (
         <div>
+            <div className="mb-6">
+                <Link
+                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Dashboard
+                </Link>
+            </div>
+
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-primary" />
@@ -124,6 +93,9 @@ export default function BloodCentersPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">Blood Centers</h1>
                     <p className="text-muted-foreground">Find blood donation centers near you</p>
+                    {medCenterId && (
+                        <p className="text-xs text-muted-foreground mt-1">Center ID: {medCenterId}</p>
+                    )}
                 </div>
             </div>
 
@@ -159,13 +131,12 @@ export default function BloodCentersPage() {
                             </div>
                             {center.specialization && (
                                 <div className="flex items-center gap-2 text-sm">
-                                    <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <span className="text-muted-foreground">{center.specialization}</span>
                                 </div>
                             )}
                             {center.directorFullName && (
                                 <div className="flex items-center gap-2 text-sm">
-                                    <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <span className="text-muted-foreground">Director: {center.directorFullName}</span>
                                 </div>
                             )}
