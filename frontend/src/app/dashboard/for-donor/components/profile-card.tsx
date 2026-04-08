@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CalendarPlus, ChevronDown, User, Settings, LogOut, Award, MapPin } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 // Extended interface for incoming data
@@ -27,7 +27,26 @@ export function ProfileCard({
                                 onLogout
                             }: ProfileProps) {
     const [isOpen, setIsOpen] = useState(false)
+    const [userId, setUserId] = useState<string>("")
     const router = useRouter()
+
+    useEffect(() => {
+        // Получаем userId из localStorage
+        const storedUserId = localStorage.getItem('userId')
+        if (storedUserId) {
+            setUserId(storedUserId)
+        } else {
+            // Пробуем получить из URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const id = urlParams.get('userId') || urlParams.get('id')
+            if (id) {
+                setUserId(id)
+                localStorage.setItem('userId', id)
+            } else {
+                setUserId("2") // дефолтный
+            }
+        }
+    }, [])
 
     // Logic to get initials: "Aruzhan Nuriddinova" -> "AN"
     const initials = name
@@ -85,12 +104,16 @@ export function ProfileCard({
         }
     }
 
+    const handleBookDonation = () => {
+        router.push(`/dashboard/for-donor/book-donation?userId=${userId}`)
+    }
+
     return (
         <div className="flex items-center gap-4">
             {/* Book Donation Button - USING PRIMARY GRADIENT */}
             <Button
                 className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground gap-2 rounded-xl px-5 border-0 shadow-md hover:opacity-90 transition-opacity"
-                onClick={() => router.push('/book-donation')}
+                onClick={handleBookDonation}
             >
                 <CalendarPlus className="w-4 h-4" />
                 <span className="hidden sm:inline">Book Donation</span>
@@ -173,30 +196,28 @@ export function ProfileCard({
 
                         <div className="space-y-1">
                             <button
-                                onClick={() => handleNavigation('/profile')}
+                                onClick={() => handleNavigation(`/dashboard/for-donor?userId=${userId}`)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                             >
                                 <User className="w-4 h-4" />
-                                My Profile
+                                Dashboard
                             </button>
 
                             <button
-                                onClick={() => handleNavigation('/settings')}
+                                onClick={() => handleNavigation(`/dashboard/for-donor/appointments?userId=${userId}`)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                             >
-                                <Settings className="w-4 h-4" />
-                                Settings
+                                <CalendarPlus className="w-4 h-4" />
+                                My Appointments
                             </button>
 
-                            {donor_level && (
-                                <button
-                                    onClick={() => handleNavigation('/achievements')}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
-                                >
-                                    <Award className="w-4 h-4" />
-                                    Achievements
-                                </button>
-                            )}
+                            <button
+                                onClick={() => handleNavigation(`/dashboard/for-donor/donation-history?userId=${userId}`)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                            >
+                                <Award className="w-4 h-4" />
+                                Donation History
+                            </button>
 
                             <hr className="my-1 border-gray-200" />
 

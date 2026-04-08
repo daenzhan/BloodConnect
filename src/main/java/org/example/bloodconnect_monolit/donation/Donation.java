@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
 import org.example.bloodconnect_monolit.donor.Donor;
 import org.example.bloodconnect_monolit.analysis.Analysis;
+import org.example.bloodconnect_monolit.appointment.Appointment;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,25 +18,32 @@ import java.time.LocalDateTime;
 public class Donation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "donation_id")
     private Long donationId;
 
+    @Column(name = "donation_date")
     private LocalDateTime donationDate;
 
+    @Column(name = "has_analysis")
     private Boolean hasAnalysis;
 
     private String status;
 
     @ManyToOne
-    @JoinColumn(name = "bloodCenterId", nullable = false)
+    @JoinColumn(name = "bloodcenter_id", nullable = false)
     private BloodCenter bloodCenter;
 
     @ManyToOne
-    @JoinColumn(name = "donorId", nullable = false)
+    @JoinColumn(name = "donor_id", nullable = false)
     private Donor donor;
 
     @OneToOne
-    @JoinColumn(name = "analysisId")
+    @JoinColumn(name = "analysis_id")
     private Analysis analysis;
+
+    @OneToOne
+    @JoinColumn(name = "appointment_id")
+    private Appointment appointment;
 
     @PrePersist
     protected void onCreate() {

@@ -4,14 +4,13 @@ import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { WelcomeCard } from "./welcome-card"
 import { DonationCountdown } from "./donation-countdown"
-import { QuickActions } from "./quick-actions"
 import { DonationCalendar } from "./donation-calendar"
 import { DonationStats } from "./donation-stats"
 import { ProfileCard } from "./profile-card"
 import { useRouter } from "next/navigation"
 
 interface DashboardData {
-    userId: number;              // ← ДОБАВЛЕНО
+    userId: number;
     fullName: string;
     bloodType: string;
     rhesusFactor: string;
@@ -31,12 +30,12 @@ interface DashboardData {
     lastDonationDate: string | null;
     daysUntilNextDonation: number;
     nextEligibleDate: string;
-    appointments: any[];
 }
 
 export default function DonorDashboard() {
     const [currentDate] = useState(new Date())
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+    const [appointments, setAppointments] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
@@ -44,13 +43,13 @@ export default function DonorDashboard() {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // Get userId from URL first (если есть)
+                // Get userId from URL first
                 const urlParams = new URLSearchParams(window.location.search);
                 let userId = urlParams.get('userId');
 
                 console.log("UserId from URL:", userId);
 
-                // Если нет в URL, берем из localStorage
+                // If not in URL, get from localStorage
                 if (!userId) {
                     const userStr = localStorage.getItem('user');
                     if (userStr) {
@@ -63,13 +62,14 @@ export default function DonorDashboard() {
                     }
                 }
 
-                // Если все еще нет userId, используем дефолтный для теста
+                // If still no userId, use default for testing
                 if (!userId) {
                     userId = '2';
                 }
 
                 console.log("Final userId:", userId);
 
+                // 1. Запрос для дашборда
                 const response = await fetch(`http://localhost:8080/donor/dashboard/${userId}`);
 
                 if (!response.ok) {
@@ -78,12 +78,30 @@ export default function DonorDashboard() {
 
                 const data = await response.json();
                 console.log("Dashboard data received:", data);
+                setDashboardData(data);
 
-                // СОХРАНЯЕМ userId В localStorage ИЗ ОТВЕТА БЭКЕНДА
+                // 2. Запрос для appointments - ТОТ ЖЕ САМЫЙ, ЧТО В APPOINTMENTS PAGE
+                // Используем /appointments/donor/{userId} как в AppointmentsPage
+                try {
+                    const appointmentsResponse = await fetch(`http://localhost:8080/appointments/donor/${userId}`);
+                    if (appointmentsResponse.ok) {
+                        const appointmentsData = await appointmentsResponse.json();
+                        console.log("Appointments data received:", appointmentsData);
+                        setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+                    } else {
+                        console.log("Appointments endpoint returned:", appointmentsResponse.status);
+                        setAppointments([]);
+                    }
+                } catch (aptError) {
+                    console.error("Error fetching appointments:", aptError);
+                    setAppointments([]);
+                }
+
+                // Save userId to localStorage from backend response
                 if (data.userId) {
                     localStorage.setItem('userId', data.userId.toString());
 
-                    // Также обновляем user объект в localStorage
+                    // Also update user object in localStorage
                     const userStr = localStorage.getItem('user');
                     if (userStr) {
                         try {
@@ -96,7 +114,6 @@ export default function DonorDashboard() {
                     }
                 }
 
-                setDashboardData(data);
                 setError(null);
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
@@ -139,7 +156,7 @@ export default function DonorDashboard() {
     if (error) {
         return (
             <div className="p-8 text-destructive text-center">
-                <p className="text-xl mb-4">⚠️ {error}</p>
+                <p className="text-xl mb-4"> {error}</p>
                 <button
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
@@ -154,6 +171,8 @@ export default function DonorDashboard() {
         return <div className="p-8 text-destructive text-center">No data found</div>;
     }
 
+    console.log("Rendering calendar with appointments:", appointments);
+
     return (
         <div className="flex min-h-screen bg-background">
             <Sidebar />
@@ -164,15 +183,11 @@ export default function DonorDashboard() {
                             Hello, {dashboardData.fullName}!
                         </h1>
                         <p className="text-muted-foreground">{formatDate(currentDate)}</p>
-                        {/* Для отладки - показываем userId */}
-                        <p className="text-xs text-muted-foreground mt-1">
-                            User ID: {dashboardData.userId}
-                        </p>
                     </div>
                     <ProfileCard
                         name={dashboardData.fullName}
                         blood_type={dashboardData.bloodType}
-                        location={`${dashboardData.city}, ${dashboardData.address.substring(0, 30)}...`}
+                        location={`${dashboardData.city}, ${dashboardData.address?.substring(0, 30) || ''}...`}
                         donor_level={dashboardData.donorLevel}
                         donor_status={dashboardData.donorStatus}
                         points={dashboardData.points}
@@ -193,11 +208,9 @@ export default function DonorDashboard() {
                     />
                 </div>
 
-                <QuickActions />
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                     <DonationCalendar
-                        appointments={dashboardData.appointments}
+                        appointments={appointments}
                     />
                     <DonationStats
                         total_donations={dashboardData.totalDonations}
