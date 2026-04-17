@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Droplet, Calendar, MapPin, FileText, Clock, XCircle, CheckCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { Sidebar } from "../components/sidebar"  // Импортируем Sidebar
+import { Sidebar } from "../components/sidebar"
 
 interface Donation {
     donationId: number;
@@ -20,6 +20,7 @@ interface Donation {
 export default function DonationHistoryPage() {
     const [donations, setDonations] = useState<Donation[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const searchParams = useSearchParams()
     const userId = searchParams.get('userId') || searchParams.get('id')
 
@@ -33,17 +34,40 @@ export default function DonationHistoryPage() {
                 fetchDonations(storedId)
             } else {
                 setIsLoading(false)
+                setError("No user ID found")
             }
         }
     }, [userId])
 
     const fetchDonations = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:8080/api/donations/donor/${id}`)
-            const data = await response.json()
+            setError(null)
+            const response = await fetch(`http://localhost:8080/donations/donor/${id}`)
+
+            // Check if response is ok (status 200-299)
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            // Check content type
+            const contentType = response.headers.get("content-type")
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error(`Expected JSON but got: ${contentType}`)
+            }
+
+            // Get response text first to debug empty responses
+            const text = await response.text()
+
+            if (!text || text.trim() === "") {
+                throw new Error("Server returned empty response")
+            }
+
+            // Parse JSON
+            const data = JSON.parse(text)
             setDonations(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Error fetching donations:", error)
+            setError(error instanceof Error ? error.message : "Failed to fetch donations")
             setDonations([])
         } finally {
             setIsLoading(false)
@@ -92,6 +116,29 @@ export default function DonationHistoryPage() {
                 <div className="flex-1 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex min-h-screen bg-background">
+                <Sidebar />
+                <main className="flex-1 p-6 lg:p-8 overflow-auto">
+                    <Card className="p-12 text-center">
+                        <div className="text-destructive mb-4">
+                            <XCircle className="w-16 h-16 mx-auto" />
+                        </div>
+                        <h3 className="text-xl font-semibold mb-2">Error Loading Donations</h3>
+                        <p className="text-muted-foreground mb-4">{error}</p>
+                        <button
+                            onClick={() => userId && fetchDonations(userId)}
+                            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                        >
+                            Try Again
+                        </button>
+                    </Card>
+                </main>
             </div>
         )
     }

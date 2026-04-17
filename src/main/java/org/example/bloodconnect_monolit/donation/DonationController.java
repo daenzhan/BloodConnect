@@ -1,18 +1,22 @@
 package org.example.bloodconnect_monolit.donation;
 
 import lombok.RequiredArgsConstructor;
+import org.example.bloodconnect_monolit.donor.DonorRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.example.bloodconnect_monolit.appointment.AppointmentService;
+
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/donations")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @RequiredArgsConstructor
 public class DonationController {
     private final DonationRepository donationRepository;
     private final AppointmentService appointmentService;
+    private final DonorRepository donorRepository;
 
     @PutMapping("/{donationId}/complete")
     public ResponseEntity<?> completeDonation(@PathVariable Long donationId) {
@@ -35,10 +39,16 @@ public class DonationController {
         }
     }
 
-    @GetMapping("/donor/{donorId}")
-    public ResponseEntity<?> getDonorDonations(@PathVariable Long donorId) {
+    @GetMapping("/donor/{userId}")
+    public ResponseEntity<?> getDonorDonationsByUserId(@PathVariable Long userId) {
         try {
-            return ResponseEntity.ok(donationRepository.findByDonor_DonorId(donorId));
+            // Сначала находим донора по userId
+            var donor = donorRepository.findByUser_UserId(userId)
+                    .orElseThrow(() -> new RuntimeException("Donor not found for user ID: " + userId));
+
+            // Получаем донации по donorId
+            List<Donation> donations = donationRepository.findByDonor_DonorId(donor.getDonorId());
+            return ResponseEntity.ok(donations);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
