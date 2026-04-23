@@ -5,6 +5,7 @@ import org.example.bloodconnect_monolit.user.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -70,17 +71,24 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/").permitAll()
-                        .requestMatchers("/home").permitAll()
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/auth/send-verification").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/auth/verify-code").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/home", "/").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/auth/me").authenticated()
+                                .requestMatchers(HttpMethod.GET, "/auth/check-email").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/auth/check-iin").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/auth/check-phone").permitAll()
                                 .requestMatchers("/donor/**").permitAll()
                                 .requestMatchers("/medcenter/**").permitAll()
                                 .requestMatchers("/blood-requests/**").permitAll()
                                 .requestMatchers("/appointments/**").permitAll()
                                 .requestMatchers("/donations/**").permitAll()
                         .requestMatchers("/blood-centers/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-//                        .requestMatchers("/donor/**").hasAnyRole("DONOR", "ADMIN")
+//                      .requestMatchers("/donor/**").hasAnyRole("DONOR", "ADMIN")
                         .requestMatchers("/blood-center/**").hasAnyRole("BLOOD_CENTER", "ADMIN")
                         .requestMatchers("/medical-center/**").hasAnyRole("MEDICAL_CENTER", "ADMIN")
                         .anyRequest().authenticated()
