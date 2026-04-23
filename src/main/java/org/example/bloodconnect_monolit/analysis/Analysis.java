@@ -14,30 +14,53 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Analysis {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "analysis_id")
     private Long analysisId;
 
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "hiv")
     private String hiv;
+
+    @Column(name = "brucellosis")
     private String brucellosis;
+
+    @Column(name = "hepatitis_b")
     private String hepatitisB;
+
+    @Column(name = "hepatitis_c")
     private String hepatitisC;
+
+    @Column(name = "syphilis")
     private String syphilis;
+
+    @Column(name = "alt_level")
     private Double altLevel;
+
+    @Column(name = "blood_group")
     private String bloodGroup;
+
+    @Column(name = "rhesus_factor")
     private String rhesusFactor;
+
+    @Column(name = "hemoglobin")
     private Double hemoglobin;
+
+    @Column(name = "analysis_date")
     private LocalDateTime analysisDate;
+
+    @Column(name = "technician_notes")
     private String technicianNotes;
 
     @OneToOne
-    @JoinColumn(name = "donationId", nullable = false)
+    @JoinColumn(name = "donation_id", nullable = false)
     private Donation donation;
 
     @ManyToOne
-    @JoinColumn(name = "bloodCenterId", nullable = false)
+    @JoinColumn(name = "blood_center_id", nullable = false)
     private BloodCenter bloodCenter;
 }

@@ -139,7 +139,7 @@ export default function DonorDashboard() {
         localStorage.removeItem('user');
         localStorage.removeItem('userId');
         localStorage.removeItem('token');
-        router.push('/login');
+        router.push('/auth/login');
     };
 
     if (isLoading) {

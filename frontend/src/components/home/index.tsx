@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useMounted } from "@/hooks/useMounted"
 import { Button } from "@/components/home/ui/button"
 import {
     Accordion,
@@ -121,14 +123,43 @@ const stats = [
 /* ─────────────────────── COMPONENT ─────────────────────── */
 
 export default function HomePage() {
+    const router = useRouter()
+    const mounted = useMounted()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+
+    const isAuthenticated = typeof window !== 'undefined' && localStorage.getItem('token')
+    const userRole = typeof window !== 'undefined' && JSON.parse(localStorage.getItem('user') || '{}')?.role
+
+
+    const handleDashboardRedirect = () => {
+        if (userRole === 'DONOR') router.push("/dashboard/for-donor")
+        else if (userRole === 'BLOOD_CENTER') router.push("/dashboard/for-bloodcenter")
+        else if (userRole === 'MEDICAL_CENTER') router.push("/dashboard/for-medcenter")
+        else if (userRole === 'ADMIN') router.push("/admin/dashboard")
+        else router.push('/dashboard')
+    }
+
+    const handleLogout = () => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        router.push('/')
+    }
+
+    if (!mounted) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-pulse">
+                    <Heart className="h-12 w-12 text-primary" />
+                </div>
+            </div>
+        )
+    }
     return (
         <div className="min-h-screen">
-            {/* ── Header ── */}
             <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
                 <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-                    <a href="/home" className="flex items-center gap-2">
+                    <a href="/" className="flex items-center gap-2">
                         <div className="flex size-9 items-center justify-center rounded-lg bg-primary">
                             <Heart className="size-5 text-primary-foreground" fill="currentColor"/>
                         </div>
@@ -136,8 +167,8 @@ export default function HomePage() {
                             className="text-xl font-bold tracking-tight text-foreground"
                             style={{fontFamily: "var(--font-heading)"}}
                         >
-              BloodConnect
-            </span>
+                            BloodConnect
+                        </span>
                     </a>
 
                     <nav className="hidden items-center gap-8 md:flex">
@@ -147,15 +178,33 @@ export default function HomePage() {
                         <a href="#faq" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                             FAQ
                         </a>
+                        {isAuthenticated && (
+                            <a href="#" onClick={handleDashboardRedirect} className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                                Dashboard
+                            </a>
+                        )}
                     </nav>
 
                     <div className="hidden items-center gap-3 md:flex">
-                        <Button variant="ghost" size="sm" onClick={() => { /* TODO: Login */ }}>
-                            Log In
-                        </Button>
-                        <Button size="sm" onClick={() => { /* TODO: Register */ }}>
-                            Register
-                        </Button>
+                        {!isAuthenticated ? (
+                            <>
+                                <Button variant="ghost" size="sm" onClick={() => router.push('/auth/login')}>
+                                    Log In
+                                </Button>
+                                <Button size="sm" onClick={() => router.push('/auth/register')}>
+                                    Register
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button variant="ghost" size="sm" onClick={handleDashboardRedirect}>
+                                    Dashboard
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={handleLogout}>
+                                    Logout
+                                </Button>
+                            </>
+                        )}
                     </div>
 
                     <button
@@ -184,13 +233,33 @@ export default function HomePage() {
                             >
                                 FAQ
                             </a>
+                            {isAuthenticated && (
+                                <a
+                                    href="#"
+                                    onClick={() => {
+                                        setMobileMenuOpen(false)
+                                        handleDashboardRedirect()
+                                    }}
+                                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                >
+                                    Dashboard
+                                </a>
+                            )}
                             <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
-                                <Button variant="outline" size="sm" className="w-full" onClick={() => { /* TODO: Login */ }}>
-                                    Log In
-                                </Button>
-                                <Button size="sm" className="w-full" onClick={() => { /* TODO: Register */ }}>
-                                    Register
-                                </Button>
+                                {!isAuthenticated ? (
+                                    <>
+                                        <Button variant="outline" size="sm" className="w-full" onClick={() => router.push('/auth/login')}>
+                                            Log In
+                                        </Button>
+                                        <Button size="sm" className="w-full" onClick={() => router.push('/auth/register')}>
+                                            Register
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button variant="outline" size="sm" className="w-full" onClick={handleLogout}>
+                                        Logout
+                                    </Button>
+                                )}
                             </div>
                         </nav>
                     </div>
@@ -198,15 +267,14 @@ export default function HomePage() {
             </header>
 
             <main>
-                {/* ── Hero ── */}
                 <section className="relative overflow-hidden bg-card">
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--color-primary)_0%,_transparent_50%)] opacity-[0.04]" />
                     <div className="mx-auto flex max-w-6xl flex-col items-center px-6 pb-20 pt-24 text-center lg:pb-28 lg:pt-32">
                         <div className="mb-6 flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5">
                             <Heart className="size-4 text-primary" fill="currentColor" />
                             <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Every Drop Counts
-              </span>
+                                Every Drop Counts
+                            </span>
                         </div>
 
                         <h1
@@ -224,15 +292,31 @@ export default function HomePage() {
                         </p>
 
                         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
-                            <Button size="lg" className="px-8 text-base" onClick={() => { /* TODO: Register */ }}>
-                                Become a Donor
-                            </Button>
-                            <Button variant="outline" size="lg" className="px-8 text-base" asChild>
-                                <a href="#how-it-works">
-                                    Learn More
-                                    <ArrowDown className="ml-1 size-4" />
-                                </a>
-                            </Button>
+                            {!isAuthenticated ? (
+                                <>
+                                    <Button size="lg" className="px-8 text-base" onClick={() => router.push('/auth/register')}>
+                                        Become a Donor
+                                    </Button>
+                                    <Button variant="outline" size="lg" className="px-8 text-base" asChild>
+                                        <a href="#how-it-works">
+                                            Learn More
+                                            <ArrowDown className="ml-1 size-4" />
+                                        </a>
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button size="lg" className="px-8 text-base" onClick={handleDashboardRedirect}>
+                                        Go to Dashboard
+                                    </Button>
+                                    <Button variant="outline" size="lg" className="px-8 text-base" asChild>
+                                        <a href="#how-it-works">
+                                            Learn More
+                                            <ArrowDown className="ml-1 size-4" />
+                                        </a>
+                                    </Button>
+                                </>
+                            )}
                         </div>
 
                         <div
@@ -247,12 +331,12 @@ export default function HomePage() {
                         <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-3">
                             {stats.map((stat) => (
                                 <div key={stat.label} className="flex flex-col items-center">
-                  <span
-                      className="text-3xl font-bold text-foreground"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {stat.value}
-                  </span>
+                                    <span
+                                        className="text-3xl font-bold text-foreground"
+                                        style={{ fontFamily: "var(--font-heading)" }}
+                                    >
+                                        {stat.value}
+                                    </span>
                                     <span className="mt-1 text-sm text-muted-foreground">{stat.label}</span>
                                 </div>
                             ))}
@@ -260,7 +344,6 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── How It Works ── */}
                 <section id="how-it-works" className="bg-background py-20 lg:py-28">
                     <div className="mx-auto max-w-6xl px-6">
                         <div className="mb-16 text-center">
@@ -290,8 +373,8 @@ export default function HomePage() {
                                             className="text-3xl font-bold text-border transition-colors group-hover:text-primary/20"
                                             style={{ fontFamily: "var(--font-heading)" }}
                                         >
-                      {item.step}
-                    </span>
+                                            {item.step}
+                                        </span>
                                     </div>
                                     <h3 className="mb-2 text-lg font-semibold text-foreground">{item.title}</h3>
                                     <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
@@ -301,7 +384,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── Eligibility ── */}
+
                 <section className="bg-card py-20 lg:py-28">
                     <div className="mx-auto max-w-6xl px-6">
                         <div className="mb-16 text-center">
@@ -355,7 +438,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── FAQ ── */}
+
                 <section id="faq" className="bg-background py-20 lg:py-28">
                     <div className="mx-auto max-w-3xl px-6">
                         <div className="mb-16 text-center">
@@ -386,7 +469,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── CTA ── */}
+
                 <section className="bg-card py-20 lg:py-28">
                     <div className="mx-auto max-w-6xl px-6">
                         <div className="relative overflow-hidden rounded-2xl bg-primary px-8 py-16 text-center md:px-16">
@@ -403,22 +486,35 @@ export default function HomePage() {
                                     Register today and schedule your first donation. It only takes a few minutes to sign up, and your contribution can save lives.
                                 </p>
                                 <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                                    <Button
-                                        size="lg"
-                                        variant="secondary"
-                                        className="px-8 text-base font-semibold"
-                                        onClick={() => { /* TODO: Register */ }}
-                                    >
-                                        Register Now
-                                    </Button>
-                                    <Button
-                                        size="lg"
-                                        variant="ghost"
-                                        className="px-8 text-base text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                                        onClick={() => { /* TODO: Login */ }}
-                                    >
-                                        Already a Donor? Log In
-                                    </Button>
+                                    {!isAuthenticated ? (
+                                        <>
+                                            <Button
+                                                size="lg"
+                                                variant="secondary"
+                                                className="px-8 text-base font-semibold"
+                                                onClick={() => router.push('/auth/register')}
+                                            >
+                                                Register Now
+                                            </Button>
+                                            <Button
+                                                size="lg"
+                                                variant="ghost"
+                                                className="px-8 text-base text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                                                onClick={() => router.push('/auth/login')}
+                                            >
+                                                Already a Donor? Log In
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button
+                                            size="lg"
+                                            variant="secondary"
+                                            className="px-8 text-base font-semibold"
+                                            onClick={handleDashboardRedirect}
+                                        >
+                                            Go to Dashboard
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -426,11 +522,11 @@ export default function HomePage() {
                 </section>
             </main>
 
-            {/* ── Footer ── */}
+
             <footer className="border-t border-border bg-card">
                 <div className="mx-auto max-w-6xl px-6 py-12">
                     <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between">
-                        <a href="/home" className="flex items-center gap-2">
+                        <a href="/" className="flex items-center gap-2">
                             <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
                                 <Heart className="size-4 text-primary-foreground" fill="currentColor"/>
                             </div>
@@ -438,8 +534,8 @@ export default function HomePage() {
                                 className="text-lg font-bold tracking-tight text-foreground"
                                 style={{fontFamily: "var(--font-heading)"}}
                             >
-                BloodConnect
-              </span>
+                                BloodConnect
+                            </span>
                         </a>
 
                         <nav className="flex flex-wrap items-center justify-center gap-6">
@@ -449,11 +545,27 @@ export default function HomePage() {
                             <a href="#faq" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                                 FAQ
                             </a>
+                            {!isAuthenticated ? (
+                                <>
+                                    <a href="/auth/login" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                        Log In
+                                    </a>
+                                    <a href="/auth/register" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                        Register
+                                    </a>
+                                </>
+                            ) : (
+                                <a href="#" onClick={handleDashboardRedirect} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                    Dashboard
+                                </a>
+                            )}
                         </nav>
                     </div>
 
                     <div className="mt-8 border-t border-border pt-8 text-center">
-                       
+                        <p className="text-xs text-muted-foreground">
+                            © {new Date().getFullYear()} BloodConnect. All rights reserved.
+                        </p>
                     </div>
                 </div>
             </footer>

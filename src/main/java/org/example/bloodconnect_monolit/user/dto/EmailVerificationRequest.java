@@ -1,4 +1,4 @@
-package org.example.bloodconnect_monolit.email.dto;
+package org.example.bloodconnect_monolit.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

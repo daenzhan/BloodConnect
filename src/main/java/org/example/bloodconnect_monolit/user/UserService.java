@@ -151,4 +151,17 @@ public class UserService implements UserDetailsService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
+
+    public boolean isEmailExists(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+
+    public boolean isIinExists(String iin) {
+        return donorRepository.existsByIin(iin);
+    }
+
+    public boolean isPhoneExists(String phone) {
+        return userRepository.existsByPhoneNumber(phone);
+    }
 }

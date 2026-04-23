@@ -30,7 +30,7 @@ public class BloodCenter {
     @Column(name = "location", nullable = false)
     private String location;
 
-    @Column(nullable = false)
+    @Column(name = "city",nullable = false)
     private String city;
 
     @Column(name = "specialization")
