@@ -1,4 +1,4 @@
-package org.example.bloodconnect_monolit.user.dto;
+package org.example.bloodconnect_monolit.email;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -17,19 +17,19 @@ public class EmailVerification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "verification_code", nullable = false)
     private String verificationCode;
 
-    @Column(nullable = false)
+    @Column(name = "expiry_date", nullable = false)
     private LocalDateTime expiryDate;
 
-    @Column(nullable = false)
+    @Column(name = "verified", nullable = false)
     private boolean verified = false;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
