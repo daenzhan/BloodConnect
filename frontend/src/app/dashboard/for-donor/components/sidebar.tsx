@@ -170,7 +170,7 @@ export function Sidebar() {
                         localStorage.removeItem('user')
                         localStorage.removeItem('userId')
                         localStorage.removeItem('token')
-                        window.location.href = '/login'
+                        window.location.href = '/auth/login'
                     }}
                     className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/20 transition-all w-full justify-center lg:justify-start text-white/80 hover:text-white group"
                 >

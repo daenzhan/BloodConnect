@@ -72,6 +72,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                .requestMatchers("/auth/**").permitAll()
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/auth/send-verification").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/auth/verify-code").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()

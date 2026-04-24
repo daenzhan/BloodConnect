@@ -36,7 +36,12 @@ public class EmailVerificationService {
         if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email already registered");
         }
-        verificationRepository.findByEmail(email).ifPresent(verificationRepository::delete);
+        verificationRepository.findByEmail(email).ifPresent(existing -> {
+            log.info("Deleting existing verification for: {}", email);
+            verificationRepository.delete(existing);
+        });
+
+        verificationRepository.flush();
 
         String code = generateVerificationCode();
         log.info("Generated code for {}: {}", email, code);

@@ -39,15 +39,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
+
         if (request.getMethod().equals("OPTIONS")) {
             response.setStatus(HttpServletResponse.SC_OK);
             filterChain.doFilter(request, response);
             return;
         }
-        String requestPath = request.getRequestURI();
-        boolean isPublicPath = PUBLIC_PATHS.stream().anyMatch(requestPath::startsWith);
 
-        if (isPublicPath) {
+        String requestPath = request.getRequestURI();
+        if (requestPath.startsWith("/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }
