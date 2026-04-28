@@ -88,4 +88,9 @@ public class BloodRequestController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @GetMapping("/bloodcenter/{bloodCenterId}")
+    public ResponseEntity<List<BloodRequest>> getRequestsByBloodCenter(@PathVariable Long bloodCenterId) {
+        return ResponseEntity.ok(bloodRequestRepository.findByBloodCenter_BloodCenterId(bloodCenterId));
+    }
 }

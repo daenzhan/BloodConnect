@@ -88,6 +88,7 @@ public class SecurityConfig {
                                 .requestMatchers("/blood-requests/**").permitAll()
                                 .requestMatchers("/appointments/**").permitAll()
                                 .requestMatchers("/donations/**").permitAll()
+                                .requestMatchers("/map/**").permitAll()
                         .requestMatchers("/blood-centers/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 //                      .requestMatchers("/donor/**").hasAnyRole("DONOR", "ADMIN")

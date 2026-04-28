@@ -22,6 +22,7 @@ public class AppointmentController {
     private final AppointmentService appointmentService;
     private final DonorRepository donorRepository;
     private final BloodCenterRepository bloodCenterRepository;
+    private final AppointmentRepository appointmentRepository;
 
     @PostMapping("/create")
     public ResponseEntity<?> createAppointment(@RequestBody Map<String, Object> request) {
@@ -38,12 +39,6 @@ public class AppointmentController {
             LocalDate appointmentDate = appointmentDateTime.toLocalDate();
             LocalDate today = LocalDate.now();
 
-            System.out.println("=== CHECKING DONATION ELIGIBILITY ===");
-            System.out.println("Donor ID: " + donor.getDonorId());
-            System.out.println("Last donation date: " + donor.getLastDonationDate());
-            System.out.println("Requested appointment date: " + appointmentDate);
-            System.out.println("Today's date: " + today);
-
             // ПРОВЕРКА 1: Дата записи не должна быть в прошлом
             if (appointmentDate.isBefore(today)) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -56,9 +51,6 @@ public class AppointmentController {
                 LocalDate lastDonation = donor.getLastDonationDate();
                 LocalDate minAllowedDate = lastDonation.plusDays(60);
 
-                System.out.println("Minimum allowed date: " + minAllowedDate);
-
-                // Сравниваем ДАТУ ЗАПИСИ с минимальной разрешенной датой
                 if (appointmentDate.isBefore(minAllowedDate)) {
                     long daysToWait = ChronoUnit.DAYS.between(lastDonation, minAllowedDate);
                     String errorMessage = String.format(
@@ -66,7 +58,6 @@ public class AppointmentController {
                                     "You must wait %d more days. Last donation was on %s.",
                             minAllowedDate, daysToWait, lastDonation.toString()
                     );
-                    System.out.println("ERROR: " + errorMessage);
                     return ResponseEntity.badRequest().body(Map.of("error", errorMessage));
                 }
             }
@@ -110,10 +101,46 @@ public class AppointmentController {
         }
     }
 
+    // Новый метод: старт записи
+    @PutMapping("/{appointmentId}/start")
+    public ResponseEntity<?> startAppointment(@PathVariable Long appointmentId) {
+        try {
+            Appointment appointment = appointmentService.startAppointment(appointmentId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Appointment started successfully",
+                    "appointmentId", appointment.getAppointmentId(),
+                    "status", appointment.getStatus()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Новый метод: завершение донации
+    @PutMapping("/{appointmentId}/complete-donation")
+    public ResponseEntity<?> completeDonation(@PathVariable Long appointmentId) {
+        try {
+            Appointment appointment = appointmentService.completeDonation(appointmentId);
+
+            // Дополнительно обновляем донора
+            Donor donor = appointment.getDonor();
+            donorRepository.save(donor);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Donation completed successfully",
+                    "appointmentId", appointment.getAppointmentId(),
+                    "status", appointment.getStatus(),
+                    "donorDonationCount", donor.getDonationCount(),
+                    "lastDonationDate", donor.getLastDonationDate()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/donor/{userId}")
     public ResponseEntity<?> getDonorAppointments(@PathVariable Long userId) {
         try {
-            // Ищем донора по userId
             Donor donor = donorRepository.findByUser_UserId(userId)
                     .orElseThrow(() -> new RuntimeException("Donor not found for user ID: " + userId));
 
@@ -151,4 +178,9 @@ public class AppointmentController {
         }
     }
 
+    @GetMapping("/bloodcenter/{bloodCenterId}")
+    public ResponseEntity<List<Appointment>> getAppointmentsByBloodCenter(@PathVariable Long bloodCenterId) {
+        List<Appointment> appointments = appointmentRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
+        return ResponseEntity.ok(appointments);
+    }
 }

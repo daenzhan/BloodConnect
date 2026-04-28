@@ -23,11 +23,11 @@ public class BloodReserve {
     @Column(nullable = false)
     private String rhesusFactor;
 
+    @Column(nullable = false)
+    private Integer quantity;
+
     @OneToOne
     @JoinColumn(name = "bloodCenterId", nullable = false)
     private BloodCenter bloodCenter;
 
-    @ManyToOne
-    @JoinColumn(name = "donationId", nullable = false)
-    private Donation donation;
 }

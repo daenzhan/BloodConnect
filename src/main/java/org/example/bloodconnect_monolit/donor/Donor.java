@@ -78,4 +78,30 @@ public class Donor {
         points = 0;
         donorStatus = "ACTIVE";
     }
+
+    public String getFirstName() {
+        if (fullName == null || fullName.trim().isEmpty()) return "Unknown";
+        String[] parts = fullName.trim().split("\\s+", 2);
+        return parts[0];
+    }
+
+    public String getLastName() {
+        if (fullName == null || fullName.trim().isEmpty()) return "";
+        String[] parts = fullName.trim().split("\\s+", 2);
+        return parts.length > 1 ? parts[1] : "";
+    }
+
+    // для форматирования группы крови с резус-фактором
+    public String getFormattedBloodType() {
+        if (bloodGroup == null) return "Unknown";
+        String rh = "";
+        if (rhesusFactor != null) {
+            if (rhesusFactor.toLowerCase().contains("positive")) {
+                rh = "+";
+            } else if (rhesusFactor.toLowerCase().contains("negative")) {
+                rh = "-";
+            }
+        }
+        return bloodGroup + rh;
+    }
 }

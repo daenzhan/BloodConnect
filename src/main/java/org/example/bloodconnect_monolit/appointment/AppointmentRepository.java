@@ -15,4 +15,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findUpcomingAppointments(@Param("donorId") Long donorId, @Param("date") LocalDateTime date);
 
     boolean existsByDonor_DonorIdAndAppointmentDateBetween(Long donorId, LocalDateTime start, LocalDateTime end);
+
+    List<Appointment> findByBloodCenter_BloodCenterId(Long bloodCenterId);
 }
