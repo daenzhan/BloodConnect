@@ -180,32 +180,19 @@ export default function AppointmentsPage() {
         }
     };
 
-    // Используем существующие работающие эндпоинты
     const handleStartAppointment = async (appointmentId: number) => {
         setUpdatingStatus(appointmentId);
         setError(null);
 
         try {
-            // Сначала создаем донацию через существующий эндпоинт
-            const donationResponse = await fetch(`http://localhost:8080/donations/create-from-appointment/${appointmentId}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-            });
-
-            if (!donationResponse.ok) {
-                const errorData = await donationResponse.json().catch(() => ({}));
-                throw new Error(errorData.error || "Failed to create donation");
-            }
-
-            // Затем обновляем статус записи на IN_PROGRESS
-            const statusResponse = await fetch(`http://localhost:8080/appointments/${appointmentId}/status`, {
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/start`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "IN_PROGRESS" })
             });
 
-            if (!statusResponse.ok) {
-                throw new Error("Failed to update appointment status");
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to start appointment");
             }
 
             await fetchAppointments();
@@ -252,11 +239,9 @@ export default function AppointmentsPage() {
         setError(null);
 
         try {
-            // Обновляем статус записи на COMPLETED
-            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/status`, {
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/complete-donation`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "COMPLETED" })
             });
 
             if (!response.ok) {
