@@ -1,6 +1,8 @@
 package org.example.bloodconnect_monolit.appointment;
 
 import lombok.RequiredArgsConstructor;
+import org.example.bloodconnect_monolit.analysis.Analysis;
+import org.example.bloodconnect_monolit.analysis.AnalysisRepository;
 import org.example.bloodconnect_monolit.donor.Donor;
 import org.example.bloodconnect_monolit.donation.Donation;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
@@ -16,6 +18,7 @@ import java.util.List;
 public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final DonationRepository donationRepository;
+    private final AnalysisRepository analysisRepository;
 
     @Transactional
     public Appointment createAppointment(Appointment appointment) {
@@ -56,13 +59,12 @@ public class AppointmentService {
         return appointmentRepository.save(appointment);
     }
 
-    // Старт записи - создаем донацию
+    // Старт записи - создаем донацию И анализ
     @Transactional
     public Appointment startAppointment(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
-        // Проверяем, что запись в статусе SCHEDULED
         if (!"SCHEDULED".equals(appointment.getStatus())) {
             throw new IllegalStateException("Cannot start appointment with status: " + appointment.getStatus());
         }
@@ -73,16 +75,24 @@ public class AppointmentService {
         donation.setBloodCenter(appointment.getBloodCenter());
         donation.setAppointment(appointment);
         donation.setDonationDate(LocalDateTime.now());
-        donation.setStatus("IN_PROGRESS"); // Статус донации - IN_PROGRESS
-        donation.setHasAnalysis(false);
+        donation.setStatus("IN_PROGRESS");
+        donation.setHasAnalysis(true); // Теперь будет анализ
 
         Donation savedDonation = donationRepository.save(donation);
-
-        // Связываем донацию с записью
         appointment.setDonation(savedDonation);
         appointment.setStatus("IN_PROGRESS");
 
-        return appointmentRepository.save(appointment);
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+
+        // СОЗДАЕМ АНАЛИЗ для этой донации
+        Analysis analysis = new Analysis();
+        analysis.setDonation(savedDonation);
+        analysis.setBloodCenter(appointment.getBloodCenter());
+        analysis.setStatus("PENDING");
+        analysis.setAnalysisDate(LocalDateTime.now());
+        analysisRepository.save(analysis);
+
+        return savedAppointment;
     }
 
     // Завершение донации
@@ -91,12 +101,10 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
-        // Проверяем, что запись в статусе IN_PROGRESS
         if (!"IN_PROGRESS".equals(appointment.getStatus())) {
             throw new IllegalStateException("Cannot complete donation for appointment with status: " + appointment.getStatus());
         }
 
-        // Проверяем, что донация существует
         if (appointment.getDonation() == null) {
             throw new IllegalStateException("No donation found for this appointment");
         }
@@ -106,13 +114,13 @@ public class AppointmentService {
 
         // Обновляем статус донации
         Donation donation = appointment.getDonation();
-        donation.setStatus("COMPLETED");
+        donation.setStatus("COMPLETED"); // Донация завершена, но анализ ещё может быть в процессе
         donationRepository.save(donation);
 
-        // Обновляем информацию о доноре
+        // Обновляем информацию о доноре (но не lastDonationDate до подтверждения анализов!)
         Donor donor = appointment.getDonor();
-        donor.setLastDonationDate(LocalDateTime.now().toLocalDate());
-        donor.setDonationCount((donor.getDonationCount() != null ? donor.getDonationCount() : 0) + 1);
+        // Не обновляем lastDonationDate и donationCount до подтверждения анализов!
+        // Они обновятся, когда анализ будет COMPLETED и донор ELIGIBLE
 
         return appointmentRepository.save(appointment);
     }
@@ -125,11 +133,17 @@ public class AppointmentService {
         appointment.setStatus("CANCELLED");
         Appointment savedAppointment = appointmentRepository.save(appointment);
 
-        // Если есть связанная донация, обновляем её статус
         if (savedAppointment.getDonation() != null) {
             Donation donation = savedAppointment.getDonation();
             donation.setStatus("CANCELLED");
             donationRepository.save(donation);
+
+            // Если есть анализ, тоже отменяем
+            analysisRepository.findByDonation_DonationId(donation.getDonationId())
+                    .ifPresent(analysis -> {
+                        analysis.setStatus("CANCELLED");
+                        analysisRepository.save(analysis);
+                    });
         }
 
         return savedAppointment;

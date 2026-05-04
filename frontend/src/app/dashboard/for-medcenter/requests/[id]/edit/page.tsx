@@ -58,7 +58,7 @@ export default function EditRequestPage() {
     const params = useParams()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
     const requestId = params.id
 
     const [formData, setFormData] = useState({
@@ -78,10 +78,14 @@ export default function EditRequestPage() {
                 if (response.ok) {
                     const data = await response.json()
                     setRequest(data)
+                    let rhesusDisplay = data.rhesusFactor || ""
+                    if (rhesusDisplay.toLowerCase().includes("positive")) rhesusDisplay = "+"
+                    if (rhesusDisplay.toLowerCase().includes("negative")) rhesusDisplay = "-"
+
                     setFormData({
                         componentType: data.componentType || "",
                         bloodGroup: data.bloodGroup || "",
-                        rhesusFactor: data.rhesusFactor || "",
+                        rhesusFactor: rhesusDisplay,
                         volume: data.volume || "",
                         deadline: data.deadline ? data.deadline.slice(0, 16) : "",
                         comment: data.comment || ""
@@ -106,6 +110,10 @@ export default function EditRequestPage() {
         setError(null)
 
         try {
+            let rhesusBackend = formData.rhesusFactor
+            if (rhesusBackend === "+") rhesusBackend = "Positive"
+            if (rhesusBackend === "-") rhesusBackend = "Negative"
+
             const response = await fetch(`http://localhost:8080/blood-requests/${requestId}`, {
                 method: "PUT",
                 headers: {
@@ -113,6 +121,7 @@ export default function EditRequestPage() {
                 },
                 body: JSON.stringify({
                     ...formData,
+                    rhesusFactor: rhesusBackend,
                     deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
                 }),
             })
@@ -121,7 +130,7 @@ export default function EditRequestPage() {
                 throw new Error("Failed to update request")
             }
 
-            router.push(`/dashboard/for-medcenter/my-requests?id=${medCenterId}`)
+            router.push(`/dashboard/for-medcenter/my-requests?userId=${userId}`)
         } catch (err) {
             console.error("Error updating request:", err)
             setError("Failed to update request. Please try again.")
@@ -154,7 +163,7 @@ export default function EditRequestPage() {
         <div className="max-w-2xl mx-auto">
             <div className="mb-6">
                 <Link
-                    href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`}
+                    href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -280,7 +289,7 @@ export default function EditRequestPage() {
                     )}
 
                     <div className="flex gap-4">
-                        <Link href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`} className="flex-1">
+                        <Link href={`/dashboard/for-medcenter/my-requests?userId=${userId}`} className="flex-1">
                             <Button
                                 type="button"
                                 variant="outline"

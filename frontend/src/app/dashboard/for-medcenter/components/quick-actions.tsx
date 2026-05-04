@@ -3,7 +3,6 @@
 import { Card } from "@/components/ui/card"
 import { FileText, ClipboardList, MapPin, User } from "lucide-react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
 
 const actions = [
     {
@@ -32,15 +31,13 @@ const actions = [
     },
 ]
 
-export function QuickActions() {
-    const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+interface QuickActionsProps {
+    userId: string
+}
 
+export function QuickActions({ userId }: QuickActionsProps) {
     const getHrefWithId = (href: string) => {
-        if (medCenterId) {
-            return `${href}?id=${medCenterId}`
-        }
-        return href
+        return `${href}?userId=${userId}`
     }
 
     return (

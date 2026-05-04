@@ -26,7 +26,7 @@ export default function BloodCentersPage() {
     const [error, setError] = useState<string | null>(null)
 
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
 
     useEffect(() => {
         const fetchCenters = async () => {
@@ -56,7 +56,6 @@ export default function BloodCentersPage() {
                 const data = await response.json()
                 console.log("Blood centers received:", data)
 
-                // Проверяем, что данные - это массив
                 if (Array.isArray(data)) {
                     setCenters(data)
                 } else {
@@ -111,7 +110,7 @@ export default function BloodCentersPage() {
         <div>
             <div className="mb-6">
                 <Link
-                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
+                    href={`/dashboard/for-medcenter?userId=${userId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -125,8 +124,6 @@ export default function BloodCentersPage() {
                 </div>
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">Blood centers</h1>
-
-
                 </div>
             </div>
 

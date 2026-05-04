@@ -39,7 +39,6 @@ interface BloodRequest {
     }
 }
 
-// Функция для преобразования rhesusFactor в символ
 const formatRhesusSymbol = (rhesusFactor: string): string => {
     if (!rhesusFactor) return "";
 
@@ -60,25 +59,26 @@ const getBloodTypeDisplay = (request: BloodRequest): string => {
 export default function MedCenterDashboard() {
     const [currentDate] = useState(new Date())
     const [medCenter, setMedCenter] = useState<MedCenterData | null>(null)
+    const [medCenterId, setMedCenterId] = useState<number | null>(null)
     const [requests, setRequests] = useState<BloodRequest[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
 
     useEffect(() => {
-        if (!medCenterId) {
-            setError("Medical Center ID not provided in URL")
+        if (!userId) {
+            setError("User ID not provided in URL")
             setIsLoading(false)
             return
         }
 
         const fetchData = async () => {
             try {
-                console.log("Fetching med center data for ID:", medCenterId)
+                console.log("Fetching med center for user ID:", userId)
 
-                const centerResponse = await fetch(`http://localhost:8080/medcenter/${medCenterId}`)
+                const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
 
                 if (!centerResponse.ok) {
                     throw new Error(`Failed to fetch medical center data: ${centerResponse.status}`)
@@ -88,7 +88,10 @@ export default function MedCenterDashboard() {
                 console.log("Center data received:", centerData)
                 setMedCenter(centerData)
 
-                const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${medCenterId}`)
+                const fetchedMedCenterId = centerData.medCenterId
+                setMedCenterId(fetchedMedCenterId)
+
+                const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${fetchedMedCenterId}`)
 
                 if (requestsResponse.ok) {
                     const requestsData = await requestsResponse.json()
@@ -113,10 +116,10 @@ export default function MedCenterDashboard() {
             }
         }
 
-        if (medCenterId) {
+        if (userId) {
             fetchData()
         }
-    }, [medCenterId])
+    }, [userId])
 
     const formatDate = (date: Date) => {
         return date.toLocaleDateString("en-US", {
@@ -173,6 +176,7 @@ export default function MedCenterDashboard() {
                 <ProfileCard
                     name={medCenter.name}
                     location={medCenter.location}
+                    userId={userId}
                 />
             </header>
 
@@ -186,7 +190,7 @@ export default function MedCenterDashboard() {
                 />
             </div>
 
-            <QuickActions />
+            <QuickActions userId={userId} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 <RecentRequests
@@ -194,6 +198,7 @@ export default function MedCenterDashboard() {
                         ...req,
                         displayBloodType: getBloodTypeDisplay(req)
                     }))}
+                    userId={userId}
                 />
                 <RequestStats
                     totalRequests={stats.totalRequests}

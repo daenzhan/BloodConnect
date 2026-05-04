@@ -39,14 +39,12 @@ public class AppointmentController {
             LocalDate appointmentDate = appointmentDateTime.toLocalDate();
             LocalDate today = LocalDate.now();
 
-            // ПРОВЕРКА 1: Дата записи не должна быть в прошлом
             if (appointmentDate.isBefore(today)) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "Cannot book appointment in the past. Please select a future date."
                 ));
             }
 
-            // ПРОВЕРКА 2: Если есть последняя донация
             if (donor.getLastDonationDate() != null) {
                 LocalDate lastDonation = donor.getLastDonationDate();
                 LocalDate minAllowedDate = lastDonation.plusDays(60);
@@ -62,14 +60,12 @@ public class AppointmentController {
                 }
             }
 
-            // ПРОВЕРКА 3: Не более 3 месяцев вперед
             if (appointmentDate.isAfter(today.plusMonths(3))) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "Cannot book more than 3 months in advance"
                 ));
             }
 
-            // ПРОВЕРКА 4: Рабочее время
             int hour = appointmentDateTime.getHour();
             if (hour < 9 || hour > 17) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -101,37 +97,30 @@ public class AppointmentController {
         }
     }
 
-    // Новый метод: старт записи
     @PutMapping("/{appointmentId}/start")
     public ResponseEntity<?> startAppointment(@PathVariable Long appointmentId) {
         try {
             Appointment appointment = appointmentService.startAppointment(appointmentId);
             return ResponseEntity.ok(Map.of(
-                    "message", "Appointment started successfully",
+                    "message", "Appointment started successfully. Donation and Analysis created.",
                     "appointmentId", appointment.getAppointmentId(),
-                    "status", appointment.getStatus()
+                    "status", appointment.getStatus(),
+                    "donationId", appointment.getDonation() != null ? appointment.getDonation().getDonationId() : null
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    // Новый метод: завершение донации
     @PutMapping("/{appointmentId}/complete-donation")
     public ResponseEntity<?> completeDonation(@PathVariable Long appointmentId) {
         try {
             Appointment appointment = appointmentService.completeDonation(appointmentId);
-
-            // Дополнительно обновляем донора
-            Donor donor = appointment.getDonor();
-            donorRepository.save(donor);
-
             return ResponseEntity.ok(Map.of(
-                    "message", "Donation completed successfully",
+                    "message", "Donation completed. Analysis is pending.",
                     "appointmentId", appointment.getAppointmentId(),
                     "status", appointment.getStatus(),
-                    "donorDonationCount", donor.getDonationCount(),
-                    "lastDonationDate", donor.getLastDonationDate()
+                    "donationId", appointment.getDonation() != null ? appointment.getDonation().getDonationId() : null
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

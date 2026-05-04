@@ -23,22 +23,19 @@ const navigation = [
 export function Sidebar() {
     const pathname = usePathname()
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
 
-    // Функция для добавления ID к ссылке
     const getHrefWithId = (href: string) => {
-        if (medCenterId) {
-            return `${href}?id=${medCenterId}`
+        if (userId) {
+            return `${href}?userId=${userId}`
         }
         return href
     }
 
-    // Проверка активного пункта меню (учитывая query параметры)
     const isActiveLink = (href: string) => {
         if (href === "/dashboard/for-medcenter") {
             return pathname === href
         }
-        // Для других страниц проверяем pathname без query параметров
         return pathname === href
     }
 
@@ -80,10 +77,9 @@ export function Sidebar() {
                 </ul>
             </nav>
 
-            {/* Опционально: показать текущий ID для отладки */}
-            {medCenterId && (
+            {userId && (
                 <div className="px-4 py-2 text-xs text-muted-foreground border-t border-border">
-                    Center ID: {medCenterId}
+                    User ID: {userId}
                 </div>
             )}
         </aside>

@@ -13,17 +13,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {
-    RadioGroup,
-    RadioGroupItem,
-} from "@/components/ui/radio-group"
 import { FileText, ArrowLeft, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
 const bloodGroups = ["A", "B", "AB", "O"]
 
-// Rhesus factors as Positive/Negative
 const rhesusFactors = [
     { value: "Positive", label: "Positive (+)" },
     { value: "Negative", label: "Negative (-)" }
@@ -54,7 +49,7 @@ const unitOptions = [
 export default function CreateRequestPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
@@ -72,13 +67,34 @@ export default function CreateRequestPage() {
         comment: ""
     })
 
+    const fetchMedCenterId = async (): Promise<number | null> => {
+        try {
+            const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
+            if (response.ok) {
+                const data = await response.json()
+                return data.medCenterId
+            }
+            return null
+        } catch (error) {
+            console.error("Error fetching med center ID:", error)
+            return null
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
         setError(null)
 
-        if (!medCenterId) {
-            setError("Medical Center ID not found")
+        if (!userId) {
+            setError("User ID not found")
+            setIsSubmitting(false)
+            return
+        }
+
+        const fetchedMedCenterId = await fetchMedCenterId()
+        if (!fetchedMedCenterId) {
+            setError("Medical center not found for this user")
             setIsSubmitting(false)
             return
         }
@@ -103,7 +119,7 @@ export default function CreateRequestPage() {
                 deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
                 comment: formData.comment || null,
                 status: "PENDING",
-                medCenter: { medCenterId: parseInt(medCenterId) }
+                medCenter: { medCenterId: fetchedMedCenterId }
             }
 
             console.log("Submitting request:", requestData)
@@ -122,7 +138,7 @@ export default function CreateRequestPage() {
 
             setIsSuccess(true)
             setTimeout(() => {
-                router.push(`/dashboard/for-medcenter/my-requests?id=${medCenterId}`)
+                router.push(`/dashboard/for-medcenter/my-requests?userId=${userId}`)
             }, 2000)
         } catch (err) {
             console.error("Error creating request:", err)
@@ -143,7 +159,7 @@ export default function CreateRequestPage() {
                     <p className="text-muted-foreground mb-4">
                         Your blood request has been submitted successfully.
                     </p>
-                    <Link href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`}>
+                    <Link href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
                             View my requests
                         </Button>
@@ -157,7 +173,7 @@ export default function CreateRequestPage() {
         <div className="max-w-2xl mx-auto p-4">
             <div className="mb-6">
                 <Link
-                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
+                    href={`/dashboard/for-medcenter?userId=${userId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -169,14 +185,12 @@ export default function CreateRequestPage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Create blood request</h1>
-
                     </div>
                 </div>
             </div>
 
             <Card className="p-6 rounded-2xl border border-border">
                 <form onSubmit={handleSubmit} className="space-y-6">
-
                     <div className="space-y-2">
                         <Label htmlFor="componentType" className="text-sm font-medium">
                             Component type <span className="text-red-500">*</span>
@@ -392,7 +406,7 @@ export default function CreateRequestPage() {
                     )}
 
                     <div className="flex gap-4 pt-4">
-                        <Link href={`/dashboard/for-medcenter?id=${medCenterId}`} className="flex-1">
+                        <Link href={`/dashboard/for-medcenter?userId=${userId}`} className="flex-1">
                             <Button
                                 type="button"
                                 variant="outline"

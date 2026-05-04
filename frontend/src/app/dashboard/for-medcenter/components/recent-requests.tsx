@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
@@ -18,6 +17,7 @@ interface BloodRequest {
 
 interface RecentRequestsProps {
     requests: BloodRequest[]
+    userId: string
 }
 
 const statusConfig = {
@@ -64,7 +64,7 @@ const formatRhesusSymbol = (rhesusFactor: string): string => {
     return rhesusFactor;
 };
 
-export function RecentRequests({ requests }: RecentRequestsProps) {
+export function RecentRequests({ requests, userId }: RecentRequestsProps) {
     const formatDate = (dateString?: string) => {
         if (!dateString) return "No deadline"
         const date = new Date(dateString)
@@ -76,11 +76,9 @@ export function RecentRequests({ requests }: RecentRequestsProps) {
     }
 
     const getBloodTypeDisplay = (request: BloodRequest): string => {
-
         if (request.displayBloodType) {
             return request.displayBloodType;
         }
-
         const rhesusSymbol = formatRhesusSymbol(request.rhesusFactor);
         return `${request.bloodGroup}${rhesusSymbol}`;
     }
@@ -90,7 +88,7 @@ export function RecentRequests({ requests }: RecentRequestsProps) {
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-foreground">Recent requests</h3>
                 <Link
-                    href="/dashboard/for-medcenter/my-requests"
+                    href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}
                     className="text-sm text-primary hover:underline"
                 >
                     View all
@@ -101,7 +99,7 @@ export function RecentRequests({ requests }: RecentRequestsProps) {
                 <div className="text-center py-8 text-muted-foreground">
                     <p>No requests yet</p>
                     <Link
-                        href="/dashboard/for-medcenter/create-request"
+                        href={`/dashboard/for-medcenter/create-request?userId=${userId}`}
                         className="text-primary hover:underline text-sm"
                     >
                         Create your first request

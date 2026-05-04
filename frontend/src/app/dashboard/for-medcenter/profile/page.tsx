@@ -30,20 +30,20 @@ export default function ProfilePage() {
 
     const searchParams = useSearchParams()
     const router = useRouter()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
 
     useEffect(() => {
-        if (!medCenterId) {
-            setError("Medical Center ID not provided in URL")
+        if (!userId) {
+            setError("User ID not provided in URL")
             setIsLoading(false)
             return
         }
 
         const fetchProfile = async () => {
             try {
-                console.log("Fetching profile for ID:", medCenterId)
+                console.log("Fetching profile for user ID:", userId)
 
-                const response = await fetch(`http://localhost:8080/medcenter/${medCenterId}`)
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
 
                 console.log("Response status:", response.status)
 
@@ -54,7 +54,7 @@ export default function ProfilePage() {
                     setEditedProfile(data)
                     setError(null)
                 } else if (response.status === 404) {
-                    setError(`Medical center with ID ${medCenterId} not found`)
+                    setError(`Medical center for user ID ${userId} not found`)
                 } else {
                     setError(`Failed to fetch profile: ${response.status}`)
                 }
@@ -66,19 +66,21 @@ export default function ProfilePage() {
             }
         }
 
-        if (medCenterId) {
+        if (userId) {
             fetchProfile()
         }
-    }, [medCenterId])
+    }, [userId])
 
     const handleSave = async () => {
+        if (!profile) return
+
         setIsSaving(true)
         setError(null)
 
         try {
-            console.log("Updating profile for ID:", medCenterId)
+            console.log("Updating profile for user ID:", userId)
 
-            const response = await fetch(`http://localhost:8080/medcenter/update/${medCenterId}`, {
+            const response = await fetch(`http://localhost:8080/medcenter/update/${profile.medCenterId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json"
@@ -147,7 +149,7 @@ export default function ProfilePage() {
         <div className="max-w-2xl mx-auto">
             <div className="mb-6">
                 <Link
-                    href={`/dashboard/for-medcenter?id=${medCenterId}`}
+                    href={`/dashboard/for-medcenter?userId=${userId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -162,7 +164,6 @@ export default function ProfilePage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Medical center profile</h1>
-
                     </div>
                 </div>
                 {!isEditing ? (

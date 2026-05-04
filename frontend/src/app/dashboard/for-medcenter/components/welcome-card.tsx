@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card"
-import { Building2, Heart } from "lucide-react"
+import { Building2 } from "lucide-react"
 
 interface WelcomeCardProps {
     centerName: string
@@ -16,7 +16,6 @@ export function WelcomeCard({ centerName }: WelcomeCardProps) {
                 <p className="text-primary-foreground/80 text-lg italic mb-4">
                     "Ready to save more lives today?"
                 </p>
-
 
                 <div className="text-xs opacity-60 mt-2">
                     @ BloodConnect

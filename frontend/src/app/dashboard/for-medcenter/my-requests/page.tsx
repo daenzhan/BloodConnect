@@ -86,10 +86,8 @@ const componentTypeLabels: Record<string, string> = {
     CRYOPRECIPITATE: "Cryoprecipitate"
 }
 
-// Функция для преобразования rhesusFactor
 const formatRhesusFactor = (rhesusFactor: string): string => {
     if (!rhesusFactor) return "";
-
     const lower = rhesusFactor.toLowerCase();
     if (lower.includes("positive") || lower === "+") {
         return "+";
@@ -109,31 +107,41 @@ export default function MyRequestsPage() {
 
     const searchParams = useSearchParams()
     const router = useRouter()
-    const medCenterId = searchParams.get('id') || "1"
+    const userId = searchParams.get('userId')
 
-    // Fetch requests
     useEffect(() => {
-        const fetchRequests = async () => {
-            try {
-                const response = await fetch(`http://localhost:8080/blood-requests/medcenter/${medCenterId}`)
+        const fetchMedCenterAndRequests = async () => {
+            if (!userId) {
+                setIsLoading(false)
+                return
+            }
 
-                if (response.ok) {
-                    const data = await response.json()
-                    setRequests(data)
+            try {
+                const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
+                if (centerResponse.ok) {
+                    const centerData = await centerResponse.json()
+                    const fetchedMedCenterId = centerData.medCenterId
+
+                    const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${fetchedMedCenterId}`)
+                    if (requestsResponse.ok) {
+                        const data = await requestsResponse.json()
+                        setRequests(data)
+                    } else {
+                        console.error("Failed to fetch requests")
+                    }
                 } else {
-                    console.error("Failed to fetch requests")
+                    console.error("Failed to fetch medical center")
                 }
             } catch (error) {
-                console.error("Error fetching requests:", error)
+                console.error("Error fetching data:", error)
             } finally {
                 setIsLoading(false)
             }
         }
 
-        fetchRequests()
-    }, [medCenterId])
+        fetchMedCenterAndRequests()
+    }, [userId])
 
-    // Delete request
     const handleDelete = async () => {
         if (!selectedRequest) return
 
@@ -144,7 +152,6 @@ export default function MyRequestsPage() {
             })
 
             if (response.ok) {
-                // Remove from list
                 setRequests(requests.filter(r => r.bloodRequestId !== selectedRequest.bloodRequestId))
                 setDeleteDialogOpen(false)
                 setSelectedRequest(null)
@@ -165,7 +172,6 @@ export default function MyRequestsPage() {
             })
 
             if (response.ok) {
-                // Update local state
                 setRequests(requests.map(r =>
                     r.bloodRequestId === requestId
                         ? { ...r, status: newStatus }
@@ -211,7 +217,6 @@ export default function MyRequestsPage() {
 
     return (
         <div>
-
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -219,11 +224,9 @@ export default function MyRequestsPage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">My requests</h1>
-
-
                     </div>
                 </div>
-                <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
+                <Link href={`/dashboard/for-medcenter/create-request?userId=${userId}`}>
                     <Button className="bg-primary hover:bg-primary/90 gap-2 rounded-xl">
                         <Plus className="w-4 h-4" />
                         New request
@@ -263,7 +266,7 @@ export default function MyRequestsPage() {
                             ? "You haven't created any blood requests yet."
                             : `No ${statusFilter.toLowerCase()} requests found.`}
                     </p>
-                    <Link href={`/dashboard/for-medcenter/create-request?id=${medCenterId}`}>
+                    <Link href={`/dashboard/for-medcenter/create-request?userId=${userId}`}>
                         <Button className="bg-primary hover:bg-primary/90 rounded-xl">
                             Create your first request
                         </Button>
@@ -282,7 +285,6 @@ export default function MyRequestsPage() {
                             <Card key={request.bloodRequestId} className="p-4 rounded-2xl border border-border hover:shadow-md transition-all relative group">
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-start gap-4 flex-1">
-
                                         <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
                                             <span className="text-lg font-bold text-primary">{bloodType}</span>
                                         </div>
@@ -347,14 +349,14 @@ export default function MyRequestsPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg">
                                                 <DropdownMenuItem
-                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/view?id=${medCenterId}`)}
+                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/view?userId=${userId}`)}
                                                     className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
                                                 >
                                                     <Eye className="w-4 h-4 mr-2" />
                                                     View details
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
-                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/edit?id=${medCenterId}`)}
+                                                    onClick={() => router.push(`/dashboard/for-medcenter/requests/${request.bloodRequestId}/edit?userId=${userId}`)}
                                                     className="cursor-pointer py-2 hover:bg-gray-100 focus:bg-gray-100 text-gray-900"
                                                 >
                                                     <Edit className="w-4 h-4 mr-2" />
@@ -380,7 +382,6 @@ export default function MyRequestsPage() {
                 </div>
             )}
 
-            {/* Delete Confirmation Dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent className="bg-white">
                     <AlertDialogHeader>

@@ -51,7 +51,7 @@ export default function ViewRequestPage() {
     const params = useParams()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const medCenterId = searchParams.get('id')
+    const userId = searchParams.get('userId')
     const requestId = params.id
 
     useEffect(() => {
@@ -88,6 +88,14 @@ export default function ViewRequestPage() {
         fetchRequest()
     }, [requestId])
 
+    const formatRhesusSymbol = (rhesusFactor: string): string => {
+        if (!rhesusFactor) return "";
+        const lower = rhesusFactor.toLowerCase();
+        if (lower.includes("positive") || lower === "+") return "+";
+        if (lower.includes("negative") || lower === "-") return "-";
+        return rhesusFactor;
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -104,7 +112,7 @@ export default function ViewRequestPage() {
             <div className="p-8 text-center">
                 <p className="text-destructive mb-4">{error || "Request not found"}</p>
                 <Button
-                    onClick={() => router.push(`/dashboard/for-medcenter/my-requests?id=${medCenterId}`)}
+                    onClick={() => router.push(`/dashboard/for-medcenter/my-requests?userId=${userId}`)}
                     className="bg-primary hover:bg-primary/90 rounded-xl"
                 >
                     Back to My Requests
@@ -115,12 +123,13 @@ export default function ViewRequestPage() {
 
     const status = statusConfig[request.status] || statusConfig.PENDING
     const componentLabel = componentTypeLabels[request.componentType] || request.componentType
+    const rhesusSymbol = formatRhesusSymbol(request.rhesusFactor)
 
     return (
         <div className="max-w-3xl mx-auto">
             <div className="mb-6">
                 <Link
-                    href={`/dashboard/for-medcenter/my-requests?id=${medCenterId}`}
+                    href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -141,10 +150,6 @@ export default function ViewRequestPage() {
                             <p className="text-muted-foreground">
                                 {componentLabel}
                             </p>
-                            {/* Показываем ID медцентра для отладки */}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Center ID: {medCenterId}
-                            </p>
                         </div>
                     </div>
                     <Badge className={`${status.color} px-3 py-1`}>
@@ -156,7 +161,7 @@ export default function ViewRequestPage() {
                     <div className="p-4 bg-muted/50 rounded-xl">
                         <p className="text-sm text-muted-foreground mb-1">Blood Type</p>
                         <p className="text-2xl font-bold text-foreground">
-                            {request.bloodGroup}{request.rhesusFactor}
+                            {request.bloodGroup}{rhesusSymbol}
                         </p>
                     </div>
                     <div className="p-4 bg-muted/50 rounded-xl">
@@ -175,17 +180,6 @@ export default function ViewRequestPage() {
                             </p>
                         </div>
                     </div>
-
-                    {request.medCenter && (
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
-                            <Building2 className="w-5 h-5 text-primary mt-0.5" />
-                            <div>
-                                <p className="text-sm text-muted-foreground">Medical Center</p>
-                                <p className="font-medium text-foreground">{request.medCenter.name}</p>
-                                <p className="text-xs text-muted-foreground">ID: {request.medCenter.medCenterId}</p>
-                            </div>
-                        </div>
-                    )}
 
                     {request.bloodCenter && (
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
@@ -209,14 +203,14 @@ export default function ViewRequestPage() {
                     <Button
                         variant="outline"
                         className="flex-1 rounded-xl"
-                        onClick={() => router.push(`/dashboard/for-medcenter/requests/${requestId}/edit?id=${medCenterId}`)}
+                        onClick={() => router.push(`/dashboard/for-medcenter/requests/${requestId}/edit?userId=${userId}`)}
                     >
                         <Edit className="w-4 h-4 mr-2" />
                         Edit Request
                     </Button>
                     <Button
                         className="flex-1 bg-primary hover:bg-primary/90 rounded-xl"
-                        onClick={() => router.push(`/dashboard/for-medcenter/my-requests?id=${medCenterId}`)}
+                        onClick={() => router.push(`/dashboard/for-medcenter/my-requests?userId=${userId}`)}
                     >
                         Back to List
                     </Button>
