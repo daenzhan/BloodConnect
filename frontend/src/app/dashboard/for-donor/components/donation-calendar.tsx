@@ -196,8 +196,8 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
             {appointments.length > 0 && (
                 <div className="mt-4 p-2 bg-primary/5 rounded-lg">
                     <p className="text-xs text-muted-foreground">
-                        Total appointments: {appointments.length} |
-                        Scheduled: {appointments.filter(a => a.status === 'SCHEDULED').length}
+                        {/*Total appointments: {appointments.length} |*/}
+                        {/*Scheduled: {appointments.filter(a => a.status === 'SCHEDULED').length}*/}
                     </p>
                 </div>
             )}

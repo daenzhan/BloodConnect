@@ -14,24 +14,10 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-    title: 'BloodConnect - Blood Donation Center',
+    title: 'BloodConnect',
     description: 'Save lives through blood donation. Learn how to donate, find answers to common questions, and register as a donor today.',
     // icons: {
-    //     icon: [
-    //         {
-    //             url: '/icon-light-32x32.png',
-    //             media: '(prefers-color-scheme: light)',
-    //         },
-    //         {
-    //             url: '/icon-dark-32x32.png',
-    //             media: '(prefers-color-scheme: dark)',
-    //         },
-    //         {
-    //             url: '/icon.svg',
-    //             type: 'image/svg+xml',
-    //         },
-    //     ],
-    //     apple: '/apple-icon.png',
+    //     icon: '/favicon.ico',
     // },
 }
 

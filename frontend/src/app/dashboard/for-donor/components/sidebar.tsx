@@ -51,8 +51,7 @@ export function Sidebar() {
         {
             icon: MapPin,
             label: "Find Centers",
-            href: "http://localhost:8080/map",
-            external: true,
+            href: `/dashboard/for-donor/find-centers?userId=${userId}`,
             matchExact: false
         },
         {
