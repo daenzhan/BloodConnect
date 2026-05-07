@@ -36,17 +36,17 @@ export const metadata: Metadata = {
     },
 }
 
-export default function RootLayout({
+export default function BloodCenterLayout({
                                        children,
                                    }: Readonly<{
     children: React.ReactNode
 }>) {
     return (
-        <html lang="en" suppressHydrationWarning>
-        <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`} suppressHydrationWarning>
-        {children}
-        <Analytics />
-        </body>
-        </html>
+        <div className="flex min-h-screen bg-background">
+
+            <main className="flex-1 overflow-auto">
+                {children}
+            </main>
+        </div>
     )
 }
