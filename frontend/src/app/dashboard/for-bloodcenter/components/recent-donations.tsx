@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FileText, ArrowRight } from "lucide-react"
+import { useSearchParams } from "next/navigation";
 import Link from "next/link"
 
 interface Donation {
@@ -44,13 +45,15 @@ export function RecentDonations({ donations }: RecentDonationsProps) {
             minute: "2-digit",
         })
     }
+    const searchParams = useSearchParams();
+    const userId = searchParams.get('userId');
 
     return (
         <Card className="p-4 rounded-2xl border border-border">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-foreground">Recent Donations</h3>
                 <Link
-                    href="/dashboard/for-bloodcenter/donations"
+                    href={`/dashboard/for-bloodcenter/donations?userId=${userId}`}
                     className="text-sm text-primary hover:underline flex items-center gap-1"
                 >
                     View All <ArrowRight className="w-4 h-4" />

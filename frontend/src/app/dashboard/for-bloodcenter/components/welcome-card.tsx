@@ -30,7 +30,6 @@ export function WelcomeCard({ centerName, location, todayDonations, pendingReque
                 </div>
             </div>
 
-            {/* Decorative elements */}
             <div className="absolute right-4 bottom-4 opacity-20">
                 <Activity className="w-24 h-24" />
             </div>
