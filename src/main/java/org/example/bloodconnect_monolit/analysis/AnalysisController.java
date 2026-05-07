@@ -4,11 +4,18 @@ import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenterRepository;
 import org.example.bloodconnect_monolit.donation.Donation;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
+import org.example.bloodconnect_monolit.donor.Donor;
+import org.example.bloodconnect_monolit.donor.DonorRepository;
+import org.example.bloodconnect_monolit.recomendationAI.AiRecommendationClient;
+import org.example.bloodconnect_monolit.recomendationAI.AiRecommendationRequest;
+import org.example.bloodconnect_monolit.recomendationAI.AiRecommendationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +34,12 @@ public class AnalysisController {
 
     @Autowired
     private BloodCenterRepository bloodCenterRepository;
+
+    @Autowired
+    private AiRecommendationClient aiRecommendationClient;
+
+    @Autowired
+    private DonorRepository donorRepository;
 
     // Создание анализа по donationId
     @PostMapping("/create-for-donation/{donationId}")
@@ -183,6 +196,147 @@ public class AnalysisController {
             return ResponseEntity.ok(analyses);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to fetch analyses: " + e.getMessage()));
+        }
+    }
+
+    // эндпоинт для получения AI-рекомендации
+    @GetMapping("/donor/{donorId}/ai-recommendation")
+    public ResponseEntity<?> getAiRecommendation(@PathVariable Long donorId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            if (donorOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Donor donor = donorOpt.get();
+
+            // Получаем последний анализ донора
+            Optional<Analysis> lastAnalysis = analysisRepository.findLatestByDonorId(donorId);
+
+            // Создаем запрос для AI
+            AiRecommendationRequest request = new AiRecommendationRequest();
+            request.setAge(calculateAge(donor.getBirthDate()));
+            request.setGender(donor.getGender().equals("MALE") ? 1 : 0);
+            request.setBloodType(donor.getFormattedBloodType());
+            request.setHeightCm(donor.getHeight());
+            request.setWeightKg(donor.getWeight());
+
+            if (lastAnalysis.isPresent()) {
+                Analysis analysis = lastAnalysis.get();
+                request.setHemoglobin(analysis.getHemoglobin() != null ? analysis.getHemoglobin() : 0);
+                request.setFerritin(null); // если есть поле ферритина
+            } else {
+                request.setHemoglobin(0);
+                request.setFerritin(null);
+            }
+
+            request.setPrevDonations(donor.getDonationCount() != null ? donor.getDonationCount() : 0);
+            request.setAvgIntervalDays(calculateAvgInterval(donor));
+            request.setLowHgbHistory(hasLowHemoglobinHistory(donorId) ? 1 : 0);
+
+            // Получаем рекомендацию от AI
+            AiRecommendationResponse aiResponse = aiRecommendationClient.getRecommendation(request);
+
+            // Сохраняем рекомендацию в БД (опционально)
+            // saveRecommendation(donorId, aiResponse);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", aiResponse.isSuccess());
+            response.put("nextDonationDays", aiResponse.getNextDonationDays());
+            response.put("readySoon", aiResponse.isReadySoon());
+            response.put("readinessLevel", aiResponse.getReadinessLevel());
+            response.put("readinessText", aiResponse.getReadinessText());
+            response.put("healthAdvice", aiResponse.getHealthAdvice());
+            response.put("confidence", aiResponse.getConfidence());
+            response.put("bmi", calculateBMI(donor.getWeight(), donor.getHeight()));
+            response.put("bmiCategory", aiResponse.getBmiCategory());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private int calculateAge(LocalDate birthDate) {
+        return Period.between(birthDate, LocalDate.now()).getYears();
+    }
+
+    private double calculateBMI(Double weight, Double height) {
+        if (weight == null || height == null) return 0;
+        return weight / Math.pow(height / 100, 2);
+    }
+
+    private Integer calculateAvgInterval(Donor donor) {
+        try {
+            List<Donation> donations = donationRepository.findByDonor_DonorIdOrderByDonationDateAsc(donor.getDonorId());
+            if (donations == null || donations.size() < 2) {
+                return null;
+            }
+
+            long totalDays = 0;
+            int intervals = 0;
+
+            for (int i = 1; i < donations.size(); i++) {
+                Donation prev = donations.get(i - 1);
+                Donation current = donations.get(i);
+
+                if (prev.getDonationDate() != null && current.getDonationDate() != null) {
+                    long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(
+                            prev.getDonationDate(),
+                            current.getDonationDate()
+                    );
+                    totalDays += daysBetween;
+                    intervals++;
+                }
+            }
+            if (intervals == 0) {
+                return null;
+            }
+            return (int) (totalDays / intervals);
+        } catch (Exception e) {
+            System.err.println("Error calculating average interval: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean hasLowHemoglobinHistory(Long donorId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            if (donorOpt.isEmpty()) {
+                return false;
+            }
+            Donor donor = donorOpt.get();
+
+            double threshold = "MALE".equals(donor.getGender()) ? 130.0 : 120.0;
+
+            List<Analysis> analyses = analysisRepository.findAllByDonorIdOrderByDateAsc(donorId);
+
+            if (analyses == null || analyses.isEmpty()) {
+                return false;
+            }
+            for (Analysis analysis : analyses) {
+                if (analysis.getHemoglobin() != null && analysis.getHemoglobin() < threshold) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            System.err.println("Error checking low hemoglobin history: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @GetMapping("/donor/{donorId}/latest")
+    public ResponseEntity<?> getLatestAnalysisByDonorId(@PathVariable Long donorId) {
+        try {
+            Optional<Analysis> analysisOpt = analysisRepository.findLatestByDonorId(donorId);
+            if (analysisOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(analysisOpt.get());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 }

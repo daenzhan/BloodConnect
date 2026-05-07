@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Send, Minimize2, Maximize2, Loader2 } from "lucide-react";
+import { MessageSquare, X, Send, Minimize2, Maximize2, Loader2, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface Message {
@@ -25,18 +25,66 @@ export function AiChatBot({ userId, donorContext }: AiChatBotProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Ключ для localStorage (уникальный для каждого пользователя)
+    const storageKey = `chat_history_${userId || "guest"}`;
+
+    // Загрузка истории чата при монтировании
+    useEffect(() => {
+        if (userId) {
+            try {
+                const savedHistory = localStorage.getItem(storageKey);
+                if (savedHistory) {
+                    const parsedHistory = JSON.parse(savedHistory);
+                    // Восстанавливаем даты (JSON превращает их в строки)
+                    const restoredMessages = parsedHistory.map((msg: any) => ({
+                        ...msg,
+                        timestamp: new Date(msg.timestamp),
+                    }));
+                    setMessages(restoredMessages);
+                }
+            } catch (error) {
+                console.error("Error loading chat history:", error);
+            }
+        }
+    }, [userId, storageKey]);
+
+    // Сохранение истории чата при изменениях
+    useEffect(() => {
+        if (userId && messages.length > 0) {
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(messages));
+            } catch (error) {
+                console.error("Error saving chat history:", error);
+            }
+        }
+    }, [messages, userId, storageKey]);
+
+    // Приветственное сообщение только если нет истории
     useEffect(() => {
         if (isOpen && messages.length === 0) {
-            setMessages([
-                {
-                    id: "welcome",
-                    text: "👋 Hello! I'm your AI blood donation assistant. Ask me anything about the donation process, preparation, or recovery!\n\n💉 **I can help you with:**\n- Preparation for donation\n- Nutrition before and after\n- Recovery process\n- Health-related questions\n- Information about your donor status",
-                    isUser: false,
-                    timestamp: new Date(),
-                },
-            ]);
+            const welcomeMessage: Message = {
+                id: "welcome",
+                text: "👋 Hello! I'm your AI blood donation assistant. Ask me anything about the donation process, preparation, or recovery!\n\n💉 **I can help you with:**\n- Preparation for donation\n- Nutrition before and after\n- Recovery process\n- Health-related questions\n- Information about your donor status",
+                isUser: false,
+                timestamp: new Date(),
+            };
+            setMessages([welcomeMessage]);
         }
     }, [isOpen, messages.length]);
+
+    // Очистка истории чата
+    const clearChatHistory = () => {
+        if (confirm("Are you sure you want to clear your chat history?")) {
+            localStorage.removeItem(storageKey);
+            const welcomeMessage: Message = {
+                id: "welcome",
+                text: "👋 Hello! I'm your AI blood donation assistant. Ask me anything about the donation process, preparation, or recovery!\n\n💉 **I can help you with:**\n- Preparation for donation\n- Nutrition before and after\n- Recovery process\n- Health-related questions\n- Information about your donor status",
+                isUser: false,
+                timestamp: new Date(),
+            };
+            setMessages([welcomeMessage]);
+        }
+    };
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -156,6 +204,16 @@ export function AiChatBot({ userId, donorContext }: AiChatBotProps) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            clearChatHistory();
+                        }}
+                        className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+                        title="Clear chat history"
+                    >
+                        <Trash2 className="w-4 h-4 text-white" />
+                    </button>
                     {!isMinimized && (
                         <button
                             onClick={(e) => {
@@ -182,7 +240,6 @@ export function AiChatBot({ userId, donorContext }: AiChatBotProps) {
                         onClick={(e) => {
                             e.stopPropagation();
                             setIsOpen(false);
-                            setMessages([]);
                         }}
                         className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                     >
@@ -255,9 +312,19 @@ export function AiChatBot({ userId, donorContext }: AiChatBotProps) {
                                 <Send className="w-4 h-4" />
                             </button>
                         </div>
-                        <p className="text-[10px] text-muted-foreground text-center mt-2">
-                            💡 AI assistant analyzes your donor profile for personalized responses
-                        </p>
+                        <div className="flex justify-between items-center mt-2">
+                            <p className="text-[10px] text-muted-foreground">
+                                💡 AI assistant analyzes your donor profile
+                            </p>
+                            {messages.length > 1 && (
+                                <button
+                                    onClick={clearChatHistory}
+                                    className="text-[10px] text-muted-foreground hover:text-red-500 transition-colors"
+                                >
+                                    Clear history
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </>
             )}

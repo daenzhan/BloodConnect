@@ -19,6 +19,15 @@ public class DonorController {
     @Autowired
     private DonorRepository donorRepository;
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getDonorByUserId(@PathVariable Long userId) {
+        Optional<Donor> donor = donorRepository.findByUser_UserId(userId);
+        if (donor.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(donor.get());
+    }
+
     @GetMapping("/dashboard/{userId}")
     public ResponseEntity<Map<String, Object>> getDashboardData(@PathVariable Long userId) {
         Optional<Donor> donorOptional = donorRepository.findByUser_UserId(userId);
@@ -31,6 +40,7 @@ public class DonorController {
         Map<String, Object> dashboardData = new HashMap<>();
 
         // ДОБАВЛЯЕМ userId В ОТВЕТ
+        dashboardData.put("donorId", donor.getDonorId());
         dashboardData.put("userId", userId);  // ← ВАЖНО: добавляем userId
 
         // Basic donor information

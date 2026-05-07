@@ -131,6 +131,7 @@ public class UserService implements UserDetailsService {
         if (request.getBloodCenterLicenseFile() != null && !request.getBloodCenterLicenseFile().isEmpty()) {
             bloodCenter.setLicenseFile(request.getBloodCenterLicenseFile());
         }
+        bloodCenter.setVerificationStatus("PENDING");
         bloodCenterRepository.save(bloodCenter);
     }
 
@@ -148,6 +149,7 @@ public class UserService implements UserDetailsService {
         if (request.getMedCenterLicenseFile() != null && !request.getMedCenterLicenseFile().isEmpty()) {
             medCenter.setLicenseFile(request.getMedCenterLicenseFile());
         }
+        medCenter.setVerificationStatus("PENDING");
         medCenterRepository.save(medCenter);
     }
 
