@@ -43,6 +43,7 @@ export default function RegisterPage() {
 
     const [step1Valid, setStep1Valid] = useState(false)
     const [donorValid, setDonorValid] = useState(false)
+    const [passwordsMatch, setPasswordsMatch] = useState(true)
 
     const [emailChecking, setEmailChecking] = useState(false)
     const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
@@ -53,6 +54,7 @@ export default function RegisterPage() {
     const [baseData, setBaseData] = useState<BaseRegistrationData>({
         email: "",
         password: "",
+        confirmPassword: "",
         phoneNumber: "",
         role: "DONOR",
     })
@@ -91,6 +93,11 @@ export default function RegisterPage() {
         directorFullName: "",
         specialization: "",
     })
+
+    useEffect(() => {
+        const match = baseData.password === baseData.confirmPassword
+        setPasswordsMatch(match)
+    }, [baseData.password, baseData.confirmPassword])
 
     useEffect(() => {
         const checkEmail = async () => {
@@ -149,8 +156,8 @@ export default function RegisterPage() {
         const isEmailValid = emailAvailable === true
         const isPhoneValid = phoneAvailable === true
         const isFormatValid = Object.keys(errors).length === 0
-        setStep1Valid(isFormatValid && isEmailValid && isPhoneValid)
-    }, [baseData, emailAvailable, phoneAvailable])
+        setStep1Valid(isFormatValid && isEmailValid && isPhoneValid && passwordsMatch)
+    }, [baseData, emailAvailable, phoneAvailable, passwordsMatch])
 
     useEffect(() => {
         if (baseData.role === "DONOR") {
@@ -164,11 +171,19 @@ export default function RegisterPage() {
     const handleSendVerificationCode = async (e: React.FormEvent) => {
         e.preventDefault()
 
+        // Проверка совпадения паролей
+        if (baseData.password !== baseData.confirmPassword) {
+            setError("Passwords do not match")
+            return
+        }
+
         if (!step1Valid) {
             if (emailAvailable === false) {
                 setError("This email is already registered. Please use another email or login.")
             } else if (phoneAvailable === false) {
                 setError("This phone number is already registered.")
+            } else if (!passwordsMatch) {
+                setError("Passwords do not match")
             } else {
                 setError("Please fill in all fields correctly")
             }
@@ -210,10 +225,11 @@ export default function RegisterPage() {
 
             const response = await register(requestData)
             const role = response.role
+            const userId = response.userId
 
             if (role === "DONOR") router.push("/dashboard/for-donor")
-            else if (role === "BLOOD_CENTER") router.push("/dashboard/for-bloodcenter")
-            else if (role === "MEDICAL_CENTER") router.push("/dashboard/for-medcenter")
+            else if (role === "BLOOD_CENTER") router.push(`/dashboard/for-bloodcenter?userId=${userId}`)
+            else if (role === "MEDICAL_CENTER") router.push(`/dashboard/for-medcenter?userId=${userId}`)
             else router.push("/dashboard")
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || "Registration failed")
@@ -431,6 +447,44 @@ export default function RegisterPage() {
                                     <PasswordStrength password={baseData.password} />
                                 </div>
 
+                                {/* Confirm Password field */}
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="confirmPassword" className="flex items-center gap-2">
+                                        Confirm Password
+                                        {baseData.confirmPassword && (
+                                            <span className={`text-xs ${passwordsMatch ? "text-green-500" : "text-red-500"}`}>
+                                                {passwordsMatch ? "✓ Match" : "✗ Passwords do not match"}
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="confirmPassword"
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Confirm your password"
+                                            value={baseData.confirmPassword}
+                                            onChange={(e) => handleBaseDataChange("confirmPassword", e.target.value)}
+                                            className={`pr-10 transition-all ${
+                                                baseData.confirmPassword && !passwordsMatch ? "border-red-500" :
+                                                    baseData.confirmPassword && passwordsMatch ? "border-green-500" : ""
+                                            }`}
+                                            required
+                                        />
+                                        {baseData.confirmPassword && passwordsMatch && (
+                                            <Check className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-500" />
+                                        )}
+                                        {baseData.confirmPassword && !passwordsMatch && (
+                                            <X className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
+                                        )}
+                                    </div>
+                                    {baseData.confirmPassword && !passwordsMatch && (
+                                        <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Passwords do not match
+                                        </p>
+                                    )}
+                                </div>
+
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="phone" className="flex items-center gap-2">
                                         Phone Number
@@ -504,7 +558,7 @@ export default function RegisterPage() {
 
                                 {!step1Valid && baseData.email && baseData.password && baseData.phoneNumber && (
                                     <p className="text-center text-xs text-yellow-500">
-                                         Please check the requirements above
+                                        Please check the requirements above
                                     </p>
                                 )}
 

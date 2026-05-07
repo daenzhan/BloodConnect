@@ -23,6 +23,9 @@ public class RegisterRequest {
             message = "Password must contain at least one digit, one lowercase, one uppercase, one special character and no spaces")
     private String password;
 
+    @NotBlank(message = "Confirm password is required")
+    private String confirmPassword;
+
     @NotBlank(message = "Role is required")
     @Pattern(regexp = "ADMIN|DONOR|BLOOD_CENTER|MEDICAL_CENTER",
             message = "Role must be ADMIN, DONOR, BLOOD_CENTER, or MEDICAL_CENTER")

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {Role} from "@/app/auth/auth-types";
 
 const API_BASE_URL = 'http://localhost:8080';
 
@@ -9,7 +10,6 @@ const api = axios.create({
         'Content-Type': 'application/json',
     },
 });
-
 
 api.interceptors.request.use((config) => {
     console.log('REQUEST:', config.method?.toUpperCase(), config.url);
@@ -32,13 +32,21 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        console.error('RESPONSE ERROR:', error.response?.status, error.response?.config?.url);
-        console.error('ERROR DATA:', error.response?.data);
-        if (error.response?.status === 401) {
+        const url = error.response?.config?.url;
+        const isLoginEndpoint = url?.includes('/auth/login');
+
+        if (!(isLoginEndpoint && error.response?.status === 401)) {
+            console.error('RESPONSE ERROR:', error.response?.status, url);
+            console.error('ERROR DATA:', error.response?.data);
+        }
+        const isAuthEndpoint = url?.includes('/auth/login') || url?.includes('/auth/register');
+
+        if (!isAuthEndpoint && error.response?.status === 401) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            window.location.href = '/auth/login';
         }
+
         return Promise.reject(error);
     }
 );
@@ -58,20 +66,68 @@ export interface AuthResponse {
     role: string;
 }
 
-export interface LoginRequest {
+export interface BaseRegistrationData {
     email: string;
     password: string;
+    confirmPassword: string;
+    phoneNumber: string;
+    role: Role;
 }
 
-export interface EmailVerificationRequest {
-    email: string;
-}
+export async function login(email: string, password: string): Promise<AuthResponse> {
+    console.log('login called for:', email);
 
-export interface VerifyCodeRequest {
-    email: string;
-    code: string;
-}
+    try {
+        const response = await api.post('/auth/login', { email, password });
+        console.log('login success:', response.data);
 
+        if (response.data.token) {
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify({
+                userId: response.data.userId,
+                id: response.data.userId,
+                email: response.data.email,
+                role: response.data.role,
+            }));
+            console.log('Token saved to localStorage');
+        }
+        return response.data;
+    } catch (error: any) {
+        console.error('login error details:', error);
+
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+
+        let errorMessage = 'Invalid email or password';
+
+        if (status === 401 || status === 403) {
+            if (errorData && typeof errorData === 'object') {
+                errorMessage = errorData.message || errorData.error || errorData;
+                if (typeof errorMessage !== 'string') {
+                    errorMessage = 'Invalid email or password';
+                }
+            } else if (typeof errorData === 'string') {
+                errorMessage = errorData;
+            }
+
+            if (errorMessage.toLowerCase().includes('password') ||
+                errorMessage.toLowerCase().includes('incorrect')) {
+                errorMessage = 'Incorrect password. Please try again.';
+            } else if (errorMessage.toLowerCase().includes('email') ||
+                errorMessage.toLowerCase().includes('not found')) {
+                errorMessage = 'Email not found. Please check your email or register.';
+            } else {
+                errorMessage = 'Invalid email or password. Please try again.';
+            }
+        } else if (status === 404) {
+            errorMessage = 'Email not found. Please register first.';
+        } else if (status === 500) {
+            errorMessage = 'Server error. Please try again later.';
+        }
+
+        throw new Error(errorMessage);
+    }
+}
 
 export async function sendVerificationCode(email: string): Promise<{ message: string; email: string }> {
     console.log('sendVerificationCode called for:', email);
@@ -85,7 +141,6 @@ export async function sendVerificationCode(email: string): Promise<{ message: st
     }
 }
 
-
 export async function verifyCode(email: string, code: string): Promise<{ message: string; email: string }> {
     console.log('verifyCode called for:', email, 'code:', code);
     try {
@@ -97,7 +152,6 @@ export async function verifyCode(email: string, code: string): Promise<{ message
         throw error;
     }
 }
-
 
 export async function register(requestData: any): Promise<AuthResponse> {
     console.log('register called with:', requestData);
@@ -120,49 +174,35 @@ export async function register(requestData: any): Promise<AuthResponse> {
         console.error('register error:', error);
         if (error.response?.data) {
             console.error('Server error details:', error.response.data);
-
             throw new Error(JSON.stringify(error.response.data));
         }
         throw error;
     }
 }
 
-
-export async function login(email: string, password: string): Promise<AuthResponse> {
-    console.log('login called for:', email);
+export async function forgotPassword(email: string): Promise<{ message: string; email: string }> {
+    console.log('forgotPassword called for:', email);
     try {
-        const response = await api.post('/auth/login', { email, password });
-        console.log('login success:', response.data);
-        if (response.data.token) {
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify({
-                userId: response.data.userId,
-                email: response.data.email,
-                role: response.data.role,
-            }));
-        }
+        const response = await api.post('/auth/forgot-password', { email });
+        console.log('forgotPassword success:', response.data);
         return response.data;
     } catch (error: any) {
-        console.error('login error:', error);
-        if (error.response?.status === 401 || error.response?.status === 403) {
-            const errorData = error.response?.data;
-            const errorMessage = errorData?.message || errorData?.error || '';
+        console.error('forgotPassword error:', error);
+        const message = error.response?.data?.error || 'Failed to send reset code';
+        throw new Error(message);
+    }
+}
 
-            if (errorMessage.toLowerCase().includes('password') || errorMessage.toLowerCase().includes('incorrect')) {
-                throw new Error('Incorrect password. Please try again.');
-            } else if (errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('not found')) {
-                throw new Error('Email not found. Please check your email or register.');
-            } else {
-                throw new Error('Invalid email or password');
-            }
-        } else if (error.response?.status === 404) {
-            throw new Error('Email not found. Please register first.');
-        } else if (error.response?.status === 400) {
-            const errorData = error.response?.data;
-            throw new Error(errorData?.message || 'Invalid request. Please check your input.');
-        } else {
-            throw new Error('Login failed. Please try again later.');
-        }
+export async function resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+    console.log('resetPassword called for:', email);
+    try {
+        const response = await api.post('/auth/reset-password', { email, code, newPassword });
+        console.log('resetPassword success:', response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error('resetPassword error:', error);
+        const message = error.response?.data?.error || 'Failed to reset password';
+        throw new Error(message);
     }
 }
 
@@ -174,7 +214,7 @@ export async function getCurrentUser(): Promise<User> {
 export function logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    window.location.href = '/auth/login';
 }
 
 export async function checkEmailExists(email: string): Promise<{ exists: boolean }> {
@@ -191,7 +231,6 @@ export async function checkPhoneExists(phone: string): Promise<{ exists: boolean
     const response = await api.get(`/auth/check-phone?phone=${encodeURIComponent(phone)}`);
     return response.data;
 }
-
 
 function transformToBackendFormat(frontendData: any): any {
     const { email, password, phoneNumber, role, donorData, bloodCenterData, medicalCenterData } = frontendData;

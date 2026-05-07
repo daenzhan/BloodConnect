@@ -6,6 +6,7 @@ export type Gender = 'MALE' | 'FEMALE';
 export interface BaseRegistrationData {
     email: string;
     password: string;
+    confirmPassword: string;
     phoneNumber: string;
     role: Role;
 }

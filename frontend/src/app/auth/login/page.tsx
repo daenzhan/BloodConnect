@@ -52,50 +52,53 @@ export default function LoginPage() {
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
 
-        const emailError = validateEmail(formData.email)
-        const passwordError = validatePassword(formData.password)
+        const emailError = validateEmail(formData.email);
+        const passwordError = validatePassword(formData.password);
 
         if (emailError || passwordError) {
             setFieldErrors({
                 email: emailError || undefined,
                 password: passwordError || undefined
-            })
-            return
+            });
+            return;
         }
 
-        setError(null)
-        setFieldErrors({})
-        setIsLoading(true)
+        setError(null);
+        setFieldErrors({});
+        setIsLoading(true);
 
         try {
-            const response = await login(formData.email, formData.password)
-            const role = response.role
+            const response = await login(formData.email, formData.password);
+            const role = response.role;
 
-            if (role === "DONOR") router.push("/dashboard/for-donor")
-            else if (role === "BLOOD_CENTER") router.push("/dashboard/for-bloodcenter")
-            else if (role === "MEDICAL_CENTER") router.push("/dashboard/for-medcenter")
-            else if (role === "ADMIN") router.push("/admin/dashboard")
-            else router.push("/dashboard")
+            if (role === "DONOR") {
+                router.push("/dashboard/for-donor");
+            } else if (role === "BLOOD_CENTER") {
+                router.push("/dashboard/for-bloodcenter");
+            } else if (role === "MEDICAL_CENTER") {
+                router.push("/dashboard/for-medcenter");
+            } else if (role === "ADMIN") {
+                router.push("/admin/dashboard");
+            } else {
+                router.push("/dashboard");
+            }
         } catch (err: any) {
-            console.error("Login error:", err)
-            const errorMessage = err.message || "Login failed"
-
+            console.error("Login error:", err);
+            const errorMessage = err.message || "Login failed";
 
             if (errorMessage.toLowerCase().includes("email not found")) {
-                setFieldErrors({ email: errorMessage })
+                setFieldErrors({ email: errorMessage });
             } else if (errorMessage.toLowerCase().includes("incorrect password")) {
-                setFieldErrors({ password: errorMessage })
-            } else if (errorMessage.toLowerCase().includes("invalid email")) {
-                setFieldErrors({ email: errorMessage })
+                setFieldErrors({ password: errorMessage });
             } else {
-                setError(errorMessage)
+                setError(errorMessage);
             }
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     if (!mounted) {
         return (
@@ -205,6 +208,7 @@ export default function LoginPage() {
                                         onChange={handlePasswordChange}
                                         required
                                         disabled={isLoading}
+                                        autoComplete="off"
                                         className={`rounded-xl border-border bg-background/50 focus:bg-background transition-all pr-10 ${
                                             fieldErrors.password ? "border-red-500 focus:border-red-500" :
                                                 formData.password && !fieldErrors.password ? "border-green-500" : ""
@@ -219,13 +223,19 @@ export default function LoginPage() {
                                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </button>
                                 </div>
+                                <div className="flex justify-end">
+                                    <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                                        Forgot password?
+                                    </Link>
+                                </div>
                                 {fieldErrors.password && (
-                                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1 animate-fade-in">
+                                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
                                         <AlertCircle className="h-3 w-3" />
                                         {fieldErrors.password}
                                     </p>
                                 )}
                             </div>
+
 
                             <Button
                                 type="submit"
