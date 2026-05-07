@@ -20,6 +20,31 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Calendar as CalendarIcon, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical, FileText, Droplets, Microscope, Stethoscope } from "lucide-react";
 
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        console.error("No token found");
+        return null;
+    }
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
+
+
+const checkAuthAndRedirect = (response: Response, router?: any) => {
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login';
+        }
+        return true;
+    }
+    return false;
+};
+
 interface Appointment {
     appointmentId: number;
     appointmentDate: string;
@@ -140,15 +165,21 @@ export default function AppointmentsPage() {
 
         setError(null);
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
 
             const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
-                signal: controller.signal
+                signal: controller.signal,
+                headers: headers
             });
 
             clearTimeout(timeoutId);
-
+            if (checkAuthAndRedirect(response)) return;
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -172,15 +203,21 @@ export default function AppointmentsPage() {
         setError(null);
 
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
 
             const response = await fetch(`http://localhost:8080/appointments/bloodcenter/${bloodCenterId}`, {
-                signal: controller.signal
+                signal: controller.signal,
+                headers: headers
             });
 
             clearTimeout(timeoutId);
-
+            if (checkAuthAndRedirect(response)) return;
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -196,17 +233,18 @@ export default function AppointmentsPage() {
         }
     }, [bloodCenterId]);
 
-    // Функция для создания анализа, если он не существует
     const createAnalysis = async (donationId: number, bloodCenterId: number) => {
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                throw new Error("No auth token");
+            }
             console.log("Creating analysis for donationId:", donationId, "bloodCenterId:", bloodCenterId);
             const response = await fetch(`http://localhost:8080/analyses/create-for-donation/${donationId}?bloodCenterId=${bloodCenterId}`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: headers,
             });
-
+            if (checkAuthAndRedirect(response)) throw new Error("Authentication failed");
             console.log("Create analysis response status:", response.status);
 
             if (!response.ok) {
@@ -225,12 +263,30 @@ export default function AppointmentsPage() {
 
     const fetchAnalysis = async (donationId: number) => {
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                console.log("No auth headers, returning null");
+                return null;
+            }
+
             console.log("Fetching analysis for donationId:", donationId);
-            const response = await fetch(`http://localhost:8080/analyses/donation/${donationId}`);
+            const response = await fetch(`http://localhost:8080/analyses/donation/${donationId}`, {
+                headers: headers
+            });
+
             console.log("Fetch analysis response status:", response.status);
 
             if (response.status === 404) {
                 console.log("Analysis not found (404)");
+                return null;
+            }
+
+
+            if (response.status === 401 || response.status === 403) {
+                console.log("Authentication failed, redirecting...");
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
                 return null;
             }
 
@@ -252,7 +308,11 @@ export default function AppointmentsPage() {
     };
 
     const saveAnalysis = async (analysisId: number, formData: Partial<Analysis>) => {
-        // Подготавливаем данные для отправки - убираем undefined значения
+        const headers = getAuthHeaders();
+        if (!headers) {
+            throw new Error("No auth token");
+        }
+
         const cleanedData: Record<string, any> = {};
 
         if (formData.hiv !== undefined && formData.hiv !== "") cleanedData.hiv = formData.hiv;
@@ -272,13 +332,10 @@ export default function AppointmentsPage() {
 
         const response = await fetch(`http://localhost:8080/analyses/${analysisId}`, {
             method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
+            headers: headers,
             body: JSON.stringify(cleanedData),
         });
-
+        if (checkAuthAndRedirect(response)) throw new Error("Authentication failed");
         console.log("Response status:", response.status);
 
         if (!response.ok) {
@@ -293,16 +350,34 @@ export default function AppointmentsPage() {
     };
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log("No token found on appointments page");
+            window.location.href = '/auth/login';
+            return;
+        }
         fetchBloodCenterId();
     }, [fetchBloodCenterId]);
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log("No token found on appointments page");
+            window.location.href = '/auth/login';
+            return;
+        }
         if (bloodCenterId) {
             fetchAppointments();
         }
     }, [bloodCenterId, fetchAppointments]);
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log("No token found on appointments page");
+            window.location.href = '/auth/login';
+            return;
+        }
         let result = [...appointments];
 
         if (searchTerm.trim()) {
@@ -337,25 +412,29 @@ export default function AppointmentsPage() {
     const handleStartAppointment = async (appointmentId: number) => {
         setUpdatingStatus(appointmentId);
         setError(null);
-
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/start`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: headers,
             });
-
+            if (checkAuthAndRedirect(response)) return;
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || "Failed to start appointment");
             }
 
             await fetchAppointments();
-            alert("✅ Appointment started! Donation record created.");
+            alert("Appointment started! Donation record created.");
 
         } catch (error) {
             console.error("Error starting appointment:", error);
             setError(error instanceof Error ? error.message : "Failed to start appointment");
-            alert(`❌ Failed to start appointment: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert(` Failed to start appointment: ${error instanceof Error ? error.message : "Please try again"}`);
         } finally {
             setUpdatingStatus(null);
         }
@@ -366,23 +445,28 @@ export default function AppointmentsPage() {
         setError(null);
 
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/cancel`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: headers,
             });
-
+            if (checkAuthAndRedirect(response)) return;
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || "Failed to cancel appointment");
             }
 
             await fetchAppointments();
-            alert("✅ Appointment cancelled successfully");
+            alert(" Appointment cancelled successfully");
 
         } catch (error) {
             console.error("Error cancelling appointment:", error);
             setError(error instanceof Error ? error.message : "Failed to cancel appointment");
-            alert(`❌ Failed to cancel appointment: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert(` Failed to cancel appointment: ${error instanceof Error ? error.message : "Please try again"}`);
         } finally {
             setUpdatingStatus(null);
         }
@@ -393,23 +477,28 @@ export default function AppointmentsPage() {
         setError(null);
 
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
             const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/complete-donation`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: headers,
             });
-
+            if (checkAuthAndRedirect(response)) return;
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || "Failed to complete donation");
             }
 
             await fetchAppointments();
-            alert("✅ Donation completed successfully! Analysis is now pending.");
+            alert(" Donation completed successfully! Analysis is now pending.");
 
         } catch (error) {
             console.error("Error completing donation:", error);
             setError(error instanceof Error ? error.message : "Failed to complete donation");
-            alert(`❌ Failed to complete donation: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert(` Failed to complete donation: ${error instanceof Error ? error.message : "Please try again"}`);
         } finally {
             setUpdatingStatus(null);
             setConfirmDialog({ isOpen: false, appointmentId: null, donorName: "" });
@@ -442,13 +531,11 @@ export default function AppointmentsPage() {
         if (appointment.donation?.donationId) {
             let analysis = await fetchAnalysis(appointment.donation.donationId);
 
-            // Если анализ не существует, создаём его
             if (!analysis && bloodCenterId) {
                 console.log("Analysis not found, creating new one...");
                 try {
                     const createResult = await createAnalysis(appointment.donation.donationId, bloodCenterId);
                     console.log("Analysis created:", createResult);
-                    // После создания, получаем анализ снова
                     analysis = await fetchAnalysis(appointment.donation.donationId);
                 } catch (error) {
                     console.error("Failed to create analysis:", error);
@@ -504,12 +591,12 @@ export default function AppointmentsPage() {
 
             if (result.isComplete) {
                 if (result.isDonorEligible) {
-                    alert("✅ Analysis completed! Donor is ELIGIBLE. Donation has been approved.");
+                    alert(" Analysis completed! Donor is ELIGIBLE. Donation has been approved.");
                 } else {
-                    alert("⚠️ Analysis completed! Donor is NOT ELIGIBLE. Donation has been rejected.");
+                    alert(" Analysis completed! Donor is NOT ELIGIBLE. Donation has been rejected.");
                 }
             } else {
-                alert("✅ Analysis saved successfully! You can continue filling later.");
+                alert(" Analysis saved successfully! You can continue filling later.");
             }
 
             await fetchAppointments();
@@ -536,15 +623,15 @@ export default function AppointmentsPage() {
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
+        <>
             <BloodCenterSidebar userId={userId} />
-            <main className="flex-1 p-6 lg:p-8 overflow-auto">
+            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto bg-gray-50">
                 <header className="flex items-start justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-semibold text-gray-800">Appointments</h1>
+                        <h1 className="text-3xl font-bold">Appointments</h1>
                         <p className="text-sm text-gray-500 mt-1">Manage donor appointments and track donations</p>
                     </div>
-                    <CenterProfileCard name="City Blood Center" city="Almaty" />
+                    <CenterProfileCard userId={userId} />
                 </header>
 
                 {error && (
@@ -593,12 +680,7 @@ export default function AppointmentsPage() {
                     </div>
                 </Card>
 
-                {isLoading ? (
-                    <div className="text-center py-12">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400 mb-2" />
-                        <p className="text-gray-500 text-sm">Loading appointments...</p>
-                    </div>
-                ) : filteredAppointments.length === 0 ? (
+                {filteredAppointments.length === 0 ? (
                     <Card className="p-12 text-center">
                         <p className="text-gray-500">No appointments found</p>
                         {(searchTerm || statusFilter !== "ALL") && (
@@ -762,7 +844,7 @@ export default function AppointmentsPage() {
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 my-2">
                         <p className="text-sm text-yellow-800">
-                            ⚠️ After completion, you will need to fill in the analysis results separately.
+                            After completion, you will need to fill in the analysis results separately.
                         </p>
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
@@ -859,6 +941,7 @@ export default function AppointmentsPage() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {/* HIV */}
                                         <div className="space-y-1.5">
                                             <Label className="text-sm font-medium text-gray-700">HIV</Label>
                                             <Select
@@ -875,6 +958,7 @@ export default function AppointmentsPage() {
                                             </Select>
                                         </div>
 
+                                        {/* Brucellosis */}
                                         <div className="space-y-1.5">
                                             <Label className="text-sm font-medium text-gray-700">Brucellosis</Label>
                                             <Select
@@ -891,6 +975,7 @@ export default function AppointmentsPage() {
                                             </Select>
                                         </div>
 
+                                        {/* Hepatitis B */}
                                         <div className="space-y-1.5">
                                             <Label className="text-sm font-medium text-gray-700">Hepatitis B</Label>
                                             <Select
@@ -907,6 +992,7 @@ export default function AppointmentsPage() {
                                             </Select>
                                         </div>
 
+                                        {/* Hepatitis C */}
                                         <div className="space-y-1.5">
                                             <Label className="text-sm font-medium text-gray-700">Hepatitis C</Label>
                                             <Select
@@ -923,6 +1009,7 @@ export default function AppointmentsPage() {
                                             </Select>
                                         </div>
 
+                                        {/* Syphilis */}
                                         <div className="space-y-1.5">
                                             <Label className="text-sm font-medium text-gray-700">Syphilis</Label>
                                             <Select
@@ -1116,6 +1203,6 @@ export default function AppointmentsPage() {
                     )}
                 </DialogContent>
             </Dialog>
-        </div>
+        </>
     );
 }
