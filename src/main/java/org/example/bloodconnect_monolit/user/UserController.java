@@ -77,8 +77,26 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authenticationService.login(request));
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            AuthResponse response = authenticationService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            String errorMessage = e.getMessage();
+            if (errorMessage.contains("not found")) {
+                error.put("error", "Email not found");
+                error.put("message", "Email not found. Please check your email or register.");
+            } else if (errorMessage.contains("password") || errorMessage.contains("incorrect")) {
+                error.put("error", "Incorrect password");
+                error.put("message", "Incorrect password. Please try again.");
+            } else {
+                error.put("error", errorMessage);
+                error.put("message", "Invalid email or password");
+            }
+
+            return ResponseEntity.status(401).body(error);
+        }
     }
 
     @GetMapping("/me")
@@ -112,5 +130,41 @@ public class UserController {
         boolean exists = userService.isPhoneExists(phone);
         response.put("exists", exists);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody EmailVerificationRequest request) {
+        try {
+            emailVerificationService.sendResetPasswordCode(request.getEmail());
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Reset code sent to " + request.getEmail());
+            response.put("email", request.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordConfirmRequest request) {
+        try {
+            boolean isValid = emailVerificationService.verifyCode(request.getEmail(), request.getCode());
+
+            if (!isValid) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Invalid or expired verification code");
+                return ResponseEntity.badRequest().body(error);
+            }
+            userService.resetPassword(request.getEmail(), request.getNewPassword());
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password reset successfully");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 }

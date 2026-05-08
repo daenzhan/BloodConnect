@@ -5,6 +5,7 @@ import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenterRepository;
 import org.example.bloodconnect_monolit.donor.Donor;
 import org.example.bloodconnect_monolit.donor.DonorRepository;
+import org.example.bloodconnect_monolit.email.EmailVerificationRepository;
 import org.example.bloodconnect_monolit.medCenter.MedCenter;
 import org.example.bloodconnect_monolit.medCenter.MedCenterRepository;
 import org.example.bloodconnect_monolit.securityConfig.JwtTokenProvider;
@@ -27,6 +28,7 @@ public class UserService implements UserDetailsService {
     private final MedCenterRepository medCenterRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final EmailVerificationRepository emailVerificationRepository;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -41,6 +43,9 @@ public class UserService implements UserDetailsService {
         }
         if (!isValidEmail(request.getEmail())) {
             throw new RuntimeException("Invalid email format");
+        }
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Passwords do not match");
         }
         if ("DONOR".equals(request.getRole())) {
             if (donorRepository.existsByIin(request.getIin())) {
@@ -163,5 +168,15 @@ public class UserService implements UserDetailsService {
 
     public boolean isPhoneExists(String phone) {
         return userRepository.existsByPhoneNumber(phone);
+    }
+
+    @Transactional
+    public void resetPassword(String email, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        emailVerificationRepository.findByEmail(email).ifPresent(emailVerificationRepository::delete);
     }
 }
