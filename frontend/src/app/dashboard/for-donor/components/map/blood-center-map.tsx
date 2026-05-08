@@ -74,7 +74,7 @@ export function BloodCenterMap({
             map.setZoom(11);
         }
 
-        // Get bounds for clustering
+
         const bounds = new google.maps.LatLngBounds();
         centers.forEach((center) => {
             if (center.latitude && center.longitude) {
@@ -132,7 +132,7 @@ export function BloodCenterMap({
                     onUnmount={onUnmount}
                     options={mapOptions}
                 >
-                    {/* User Location Circle */}
+
                     {userLocation && (
                         <>
                             <Marker
@@ -157,7 +157,7 @@ export function BloodCenterMap({
                         </>
                     )}
 
-                    {/* Blood Centers Markers */}
+
                     {centers.map((center) => {
                         if (!center.latitude || !center.longitude) return null;
                         const isSelected = selectedCenter?.bloodCenterId === center.bloodCenterId;
@@ -172,7 +172,7 @@ export function BloodCenterMap({
                         );
                     })}
 
-                    {/* Info Window */}
+
                     {activeMarker && (
                         <InfoWindow
                             position={{
@@ -190,12 +190,12 @@ export function BloodCenterMap({
                                 </p>
                                 {activeMarker.distance !== undefined && (
                                     <p className="text-xs text-primary mt-1 font-medium">
-                                        📍 {activeMarker.distance.toFixed(1)} km away
+                                         {activeMarker.distance.toFixed(1)} km away
                                     </p>
                                 )}
                                 {activeMarker.specialization && (
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        🏥 {activeMarker.specialization}
+                                         {activeMarker.specialization}
                                     </p>
                                 )}
                                 <Button
@@ -210,7 +210,6 @@ export function BloodCenterMap({
                     )}
                 </GoogleMap>
 
-                {/* Controls Overlay */}
                 {userLocation && (
                     <button
                         onClick={centerMapOnUser}

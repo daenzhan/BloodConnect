@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, MapPin, ArrowLeft, AlertCircle } from "lucide-react"
+import {Calendar, Clock, MapPin, ArrowLeft, AlertCircle, Loader2, Plus} from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Sidebar } from "../components/sidebar"
+import {ProfileCard} from "@/app/dashboard/for-donor/components/profile-card";
 
 interface BloodCenter {
     bloodCenterId: number;
@@ -34,33 +35,58 @@ export default function BookDonationPage() {
     const searchParams = useSearchParams()
     const userId = searchParams.get('userId') || searchParams.get('id')
 
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token')
+        console.log('Token exists:', !!token)
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    }
+
     useEffect(() => {
-        if (userId) {
-            localStorage.setItem('userId', userId)
-            fetchDonorInfo(userId)
+        const token = localStorage.getItem('token')
+        console.log('Checking auth, token exists:', !!token)
+        if (!token) {
+            console.log('No token found, redirecting to login...')
+            router.push('/auth/login')
+            return
+        }
+        const storedId = userId || localStorage.getItem('userId')
+        if (storedId) {
+            fetchDonorInfo(storedId)
         } else {
-            const storedId = localStorage.getItem('userId')
-            if (storedId) {
-                fetchDonorInfo(storedId)
-            } else {
-                setIsLoadingDonor(false)
-            }
+            setIsLoadingDonor(false)
         }
         fetchBloodCenters()
     }, [userId])
 
+
     const fetchDonorInfo = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:8080/donor/dashboard/${id}`)
+            console.log('Fetching donor info for id:', id)
+            const response = await fetch(`http://localhost:8080/donor/dashboard/${id}`, {
+                method: 'GET',
+                headers: getAuthHeaders()
+            })
+            console.log('Donor info response status:', response.status)
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token')
+                localStorage.removeItem('user')
+                localStorage.removeItem('userId')
+                router.push('/auth/login')
+                return
+            }
             if (response.ok) {
                 const data = await response.json()
+                console.log('Donor info received:', data)
                 setDonorInfo({
                     lastDonationDate: data.lastDonationDate,
                     nextEligibleDate: data.nextEligibleDate,
                     daysUntilNextDonation: data.daysUntilNextDonation
                 })
 
-                // Устанавливаем минимальную дату для записи
+
                 if (data.nextEligibleDate) {
                     const eligibleDate = new Date(data.nextEligibleDate)
                     const tomorrow = new Date()
@@ -85,7 +111,19 @@ export default function BookDonationPage() {
 
     const fetchBloodCenters = async () => {
         try {
-            const response = await fetch("http://localhost:8080/blood-centers")
+            console.log('Fetching blood centers...')
+            const response = await fetch("http://localhost:8080/blood-centers", {
+                method: 'GET',
+                headers: getAuthHeaders()
+            })
+            console.log('Blood centers response status:', response.status)
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token')
+                localStorage.removeItem('user')
+                localStorage.removeItem('userId')
+                router.push('/auth/login')
+                return
+            }
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`)
             }
@@ -113,10 +151,10 @@ export default function BookDonationPage() {
         try {
             const appointmentDateTime = `${selectedDate}T${selectedTime}:00`
             const donorId = parseInt(userId || localStorage.getItem('userId') || "2")
-
+            console.log('Booking appointment for donor:', donorId)
             const response = await fetch("http://localhost:8080/appointments/create", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     donorId: donorId,
                     bloodCenterId: parseInt(selectedCenter),
@@ -124,6 +162,14 @@ export default function BookDonationPage() {
                     notes: "Booked via web interface"
                 })
             })
+            console.log('Booking response status:', response.status)
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token')
+                localStorage.removeItem('user')
+                localStorage.removeItem('userId')
+                router.push('/auth/login')
+                return
+            }
 
             const data = await response.json()
 
@@ -145,7 +191,7 @@ export default function BookDonationPage() {
     maxDateObj.setMonth(maxDateObj.getMonth() + 3)
     const maxDate = maxDateObj.toISOString().split('T')[0]
 
-    if (isLoadingCenters || isLoadingDonor) {
+    if ( isLoadingCenters || isLoadingDonor) {
         return (
             <div className="flex min-h-screen bg-background">
                 <Sidebar />
@@ -160,26 +206,21 @@ export default function BookDonationPage() {
     }
 
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="min-h-screen bg-background">
             <Sidebar />
-            <main className="flex-1 p-6 lg:p-8 overflow-auto">
-                <div className="max-w-2xl mx-auto">
-                    <Button
-                        variant="ghost"
-                        onClick={() => router.back()}
-                        className="mb-6"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back to Appointments
-                    </Button>
-
-                    <Card className="p-6">
-                        <div className="text-center mb-6">
+            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
+                    <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                        <div>
                             <h1 className="text-2xl font-bold text-foreground">Book a Donation Appointment</h1>
                             <p className="text-muted-foreground mt-1">Schedule your next blood donation</p>
                         </div>
+                        <div className="flex items-center gap-3">
+                            <ProfileCard userId={userId} showBookButton={false} />
+                        </div>
 
-                        {/* Информация о последней донации */}
+                    <Card className="p-6">
+                        <h1 className="text-xl font-bold text-foreground">Donation form</h1>
+
                         {donorInfo && donorInfo.lastDonationDate && (
                             <div className="mb-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
                                 <div className="flex items-start gap-3">
@@ -287,7 +328,7 @@ export default function BookDonationPage() {
                             >
                                 {isLoading ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                         Booking...
                                     </>
                                 ) : (
@@ -299,5 +340,5 @@ export default function BookDonationPage() {
                 </div>
             </main>
         </div>
-    )
+    );
 }

@@ -24,7 +24,6 @@ interface DonationCalendarProps {
 export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date())
 
-    // Отладка - проверяем, что приходит
     useEffect(() => {
         console.log("DonationCalendar received appointments:", appointments)
         console.log("Number of appointments:", appointments?.length)
@@ -39,7 +38,7 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
     const firstDayOfMonth = new Date(year, month, 1)
     const lastDayOfMonth = new Date(year, month + 1, 0)
 
-    // Adjust for Monday start (0 = Monday, 6 = Sunday)
+
     let startDay = firstDayOfMonth.getDay() - 1
     if (startDay < 0) startDay = 6
 
@@ -79,20 +78,20 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
         )
     }
 
-    // Generate calendar days
+
     const days: (number | null)[] = []
 
-    // Previous month days
+
     for (let i = startDay - 1; i >= 0; i--) {
         days.push(null)
     }
 
-    // Current month days
+
     for (let i = 1; i <= daysInMonth; i++) {
         days.push(i)
     }
 
-    // Get upcoming appointments (next 7 days)
+
     const getUpcomingAppointments = () => {
         const today = new Date()
         const nextWeek = new Date()
@@ -140,7 +139,6 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
                 </div>
             </div>
 
-            {/* Days header */}
             <div className="grid grid-cols-7 gap-0.5 mb-1">
                 {DAYS.map((day) => (
                     <div
@@ -152,7 +150,6 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
                 ))}
             </div>
 
-            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-0.5">
                 {days.map((day, index) => {
                     if (day === null) {
@@ -186,7 +183,7 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
                 })}
             </div>
 
-            {/* Debug info - временно, чтобы видеть что приходит */}
+
             {appointments.length === 0 && (
                 <div className="mt-4 p-2 bg-yellow-100/10 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">No appointments data received</p>
@@ -202,7 +199,7 @@ export function DonationCalendar({ appointments = [] }: DonationCalendarProps) {
                 </div>
             )}
 
-            {/* Upcoming appointments */}
+
             {upcomingAppointments.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-border">
                     <h4 className="text-xs font-medium text-muted-foreground mb-2">Upcoming Appointments</h4>

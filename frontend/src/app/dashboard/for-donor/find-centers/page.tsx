@@ -1,138 +1,185 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { MapPin, Search, ExternalLink, Building2, ArrowLeft, AlertCircle } from "lucide-react"
-import { useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { Sidebar } from "../components/sidebar"
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Search, ExternalLink, Building2, ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Sidebar } from "../components/sidebar";
+import {ProfileCard} from "@/app/dashboard/for-donor/components/profile-card";
 
 interface BloodCenter {
-    bloodCenterId: number
-    name: string
-    location: string
-    city: string
-    specialization?: string
-    directorFullName?: string
-    latitude?: number
-    longitude?: number
+    bloodCenterId: number;
+    name: string;
+    location: string;
+    city: string;
+    specialization?: string;
+    directorFullName?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export default function FindCentersPage() {
-    const [centers, setCenters] = useState<BloodCenter[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState("")
-    const [error, setError] = useState<string | null>(null)
+    const [centers, setCenters] = useState<BloodCenter[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [error, setError] = useState<string | null>(null);
 
-    const searchParams = useSearchParams()
-    const userId = searchParams.get('userId')
+    const searchParams = useSearchParams();
+    const userId = searchParams.get('userId');
 
-    // Fetch blood centers
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.error("No token found");
+            return null;
+        }
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        };
+    };
+
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+        }
+    }, []);
+
+
     useEffect(() => {
         const fetchCenters = async () => {
             try {
-                setError(null)
-                console.log("Fetching blood centers from backend...")
+                setError(null);
+                console.log("Fetching blood centers from backend...");
+
+                const headers = getAuthHeaders();
+                if (!headers) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
 
                 const response = await fetch("http://localhost:8080/blood-centers", {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                })
+                    headers: headers
+                });
 
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch blood centers: ${response.status}`)
+                console.log("Response status:", response.status);
+
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('userId');
+                    window.location.href = '/auth/login';
+                    return;
                 }
 
-                const data = await response.json()
-                console.log("Blood centers received:", data)
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch blood centers: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("Blood centers received:", data);
 
                 if (Array.isArray(data)) {
-                    setCenters(data)
+                    setCenters(data);
                 } else {
-                    setCenters([])
+                    setCenters([]);
                 }
 
             } catch (error) {
-                console.error("Error fetching blood centers:", error)
-                setError(error instanceof Error ? error.message : "Failed to load blood centers")
-                setCenters([])
+                console.error("Error fetching blood centers:", error);
+                setError(error instanceof Error ? error.message : "Failed to load blood centers");
+                setCenters([]);
             } finally {
-                setIsLoading(false)
+                setIsLoading(false);
             }
-        }
+        };
 
-        fetchCenters()
-    }, [])
+        fetchCenters();
+    }, []);
 
     const filteredCenters = centers.filter(center =>
         center.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         center.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         center.city?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    );
 
     const getFullAddress = (center: BloodCenter) => {
-        return `${center.location || ''}, ${center.city || ''}`
-    }
+        return `${center.location || ''}, ${center.city || ''}`;
+    };
 
     const openInMaps = (center: BloodCenter) => {
         if (center.latitude && center.longitude) {
-            window.open(`https://maps.google.com/?q=${center.latitude},${center.longitude}`, "_blank")
+            window.open(`https://maps.google.com/?q=${center.latitude},${center.longitude}`, "_blank");
         } else if (center.location && center.city) {
-            window.open(`https://maps.google.com/?q=${encodeURIComponent(getFullAddress(center))}`, "_blank")
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(getFullAddress(center))}`, "_blank");
         } else {
-            window.open(`https://maps.google.com/?q=${encodeURIComponent(center.name)}`, "_blank")
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(center.name)}`, "_blank");
         }
-    }
+    };
+
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen bg-background">
+            <div className="min-h-screen bg-background">
                 <Sidebar />
-                <div className="flex-1 flex items-center justify-center">
+                <main className="ml-20 lg:ml-64 p-6 flex items-center justify-center min-h-screen">
                     <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                        <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
                         <p className="text-muted-foreground">Loading blood centers...</p>
                     </div>
-                </div>
+                </main>
             </div>
-        )
+        );
+    }
+
+
+    if (!userId || userId === 'null') {
+        return (
+            <div className="min-h-screen bg-background">
+                <Sidebar />
+                <main className="ml-20 lg:ml-64 p-6">
+                    <Card className="p-6 text-center">
+                        <p className="text-red-600">Access Denied: User ID not found</p>
+                        <button
+                            onClick={() => window.location.href = '/auth/login'}
+                            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                        >
+                            Go to Login
+                        </button>
+                    </Card>
+                </main>
+            </div>
+        );
     }
 
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="min-h-screen bg-background">
             <Sidebar />
-            <main className="flex-1 p-6 lg:p-8 overflow-auto">
+            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
                 <div className="max-w-7xl mx-auto">
-                    {/* Header with Back Button */}
-                    <div className="mb-6">
-                        <Link
-                            href={`/dashboard/for-donor?userId=${userId}`}
-                            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            Back to Dashboard
-                        </Link>
+
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                                <MapPin className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold text-foreground">Find Blood Centers</h1>
+                                <p className="text-muted-foreground mt-1">
+                                    Browse all blood donation centers
+                                </p>
+                            </div>
+                        </div>
+                        <ProfileCard userId={userId} showBookButton={false} />
                     </div>
 
-                    {/* Page Title */}
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                            <MapPin className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-foreground">Find Blood Centers</h1>
-                            <p className="text-muted-foreground mt-1">
-                                Browse all blood donation centers
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Search Bar */}
                     <div className="relative mb-6">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                         <Input
@@ -148,7 +195,7 @@ export default function FindCentersPage() {
                         )}
                     </div>
 
-                    {/* Error Message */}
+
                     {error && (
                         <Card className="p-6 mb-6 bg-destructive/5 border-destructive/20 rounded-xl">
                             <div className="flex items-start gap-3">
@@ -164,7 +211,7 @@ export default function FindCentersPage() {
                         </Card>
                     )}
 
-                    {/* No Centers Found */}
+
                     {!error && centers.length === 0 ? (
                         <Card className="p-12 text-center rounded-xl border border-border">
                             <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -176,11 +223,11 @@ export default function FindCentersPage() {
                             </p>
                         </Card>
                     ) : (
-                        /* Centers Grid */
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
                             {filteredCenters.map((center) => (
                                 <Card key={center.bloodCenterId} className="p-5 rounded-xl border border-border hover:shadow-lg transition-all duration-200">
-                                    {/* Header */}
+
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-start gap-3">
                                             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -193,7 +240,7 @@ export default function FindCentersPage() {
                                         </div>
                                     </div>
 
-                                    {/* Details */}
+
                                     <div className="space-y-2 mb-5">
                                         <div className="flex items-start gap-2 text-sm">
                                             <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -212,7 +259,7 @@ export default function FindCentersPage() {
                                         )}
                                     </div>
 
-                                    {/* Actions */}
+
                                     <Button
                                         variant="outline"
                                         className="w-full rounded-lg"
@@ -226,7 +273,6 @@ export default function FindCentersPage() {
                         </div>
                     )}
 
-                    {/* No Search Results */}
                     {!error && centers.length > 0 && filteredCenters.length === 0 && (
                         <Card className="p-12 text-center rounded-xl border border-border mt-6">
                             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -243,10 +289,7 @@ export default function FindCentersPage() {
                             </Button>
                         </Card>
                     )}
-
-
                 </div>
             </main>
         </div>
-    )
-}
+    );}
