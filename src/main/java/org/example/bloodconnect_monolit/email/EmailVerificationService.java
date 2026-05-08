@@ -105,4 +105,57 @@ public class EmailVerificationService {
                 .map(EmailVerification::isVerified)
                 .orElse(false);
     }
+
+    @Transactional
+    public void sendResetPasswordCode(String email) {
+        log.info("Sending reset password code to: {}", email);
+
+        if (!userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email not found");
+        }
+
+        verificationRepository.findByEmail(email).ifPresent(existing -> {
+            log.info("Deleting existing verification for: {}", email);
+            verificationRepository.delete(existing);
+        });
+
+        verificationRepository.flush();
+
+        String code = generateVerificationCode();
+        log.info("Generated reset code for {}: {}", email, code);
+
+        EmailVerification verification = new EmailVerification();
+        verification.setEmail(email);
+        verification.setVerificationCode(code);
+        verification.setVerified(false);
+        verification.setExpiryDate(LocalDateTime.now().plusMinutes(expirationMinutes));
+        verificationRepository.save(verification);
+
+        try {
+            sendResetPasswordEmail(email, code);
+            log.info("Reset password email sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send reset password email to {}: {}", email, e.getMessage());
+            throw new RuntimeException("Failed to send reset password email. Please try again.");
+        }
+    }
+
+    private void sendResetPasswordEmail(String to, String code) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("BloodConnect - Reset Your Password");
+        message.setText(String.format(
+                "Hello!\n\n" +
+                        "You have requested to reset your password on BloodConnect.\n\n" +
+                        "Your verification code: %s\n\n" +
+                        "The code is valid for %d minutes.\n\n" +
+                        "If you didn't request a password reset, please ignore this email.\n\n" +
+                        "Sincerely,\n" +
+                        "The BloodConnect Team",
+                code, expirationMinutes
+        ));
+        message.setFrom("noreply@bloodconnect.com");
+
+        mailSender.send(message);
+    }
 }
