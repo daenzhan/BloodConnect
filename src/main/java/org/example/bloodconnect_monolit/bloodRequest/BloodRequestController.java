@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/blood-requests")
@@ -92,5 +93,17 @@ public class BloodRequestController {
     @GetMapping("/bloodcenter/{bloodCenterId}")
     public ResponseEntity<List<BloodRequest>> getRequestsByBloodCenter(@PathVariable Long bloodCenterId) {
         return ResponseEntity.ok(bloodRequestRepository.findByBloodCenter_BloodCenterId(bloodCenterId));
+    }
+
+    @GetMapping("/bloodcenter/{bloodCenterId}/pending/count")
+    public ResponseEntity<?> getPendingRequestsCount(@PathVariable Long bloodCenterId) {
+        try {
+            long count = bloodRequestRepository.countByBloodCenter_BloodCenterIdAndStatus(
+                    bloodCenterId, "PENDING"
+            );
+            return ResponseEntity.ok(count);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

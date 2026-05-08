@@ -1,5 +1,6 @@
 package org.example.bloodconnect_monolit.bloodReserve;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -26,8 +27,9 @@ public class BloodReserve {
     @Column(nullable = false)
     private Integer quantity;
 
-    @OneToOne
-    @JoinColumn(name = "bloodCenterId", nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "bloodCenterId")
+    @JsonIgnore
     private BloodCenter bloodCenter;
 
 }

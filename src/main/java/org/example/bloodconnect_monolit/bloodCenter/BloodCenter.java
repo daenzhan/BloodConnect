@@ -1,5 +1,6 @@
 package org.example.bloodconnect_monolit.bloodCenter;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,6 +9,8 @@ import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
 import org.example.bloodconnect_monolit.user.User;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "bloodcenters")
@@ -51,6 +54,7 @@ public class BloodCenter {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @OneToOne(mappedBy = "bloodCenter")
-    private BloodReserve bloodReserve;
+    @OneToMany(mappedBy = "bloodCenter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<BloodReserve> bloodReserves = new ArrayList<>();
 }

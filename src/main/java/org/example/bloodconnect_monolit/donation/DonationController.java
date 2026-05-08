@@ -7,6 +7,7 @@ import org.example.bloodconnect_monolit.donor.DonorRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +122,21 @@ public class DonationController {
                     .orElseThrow(() -> new RuntimeException("Donor not found for user ID: " + userId));
 
             List<Donation> donations = donationRepository.findByDonor_DonorId(donor.getDonorId());
+            return ResponseEntity.ok(donations);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/bloodcenter/{bloodCenterId}/date")
+    public ResponseEntity<?> getDonationsByDate(@PathVariable Long bloodCenterId, @RequestParam String date) {
+        try {
+            LocalDateTime startOfDay = LocalDate.parse(date).atStartOfDay();
+            LocalDateTime endOfDay = startOfDay.plusDays(1);
+
+            List<Donation> donations = donationRepository.findByBloodCenter_BloodCenterIdAndDonationDateBetween(
+                    bloodCenterId, startOfDay, endOfDay
+            );
             return ResponseEntity.ok(donations);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
