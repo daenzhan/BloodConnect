@@ -102,4 +102,79 @@ public class DonorController {
     }
 
 
+    @GetMapping("/top-donors")
+    public ResponseEntity<List<Map<String, Object>>> getTopDonors() {
+        List<Donor> allDonors = donorRepository.findAll();
+
+        // Сортируем доноров по количеству донаций (от большего к меньшему)
+        List<Donor> sortedDonors = allDonors.stream()
+                .filter(d -> d.getDonationCount() != null && d.getDonationCount() > 0)
+                .sorted((a, b) -> b.getDonationCount().compareTo(a.getDonationCount()))
+                .limit(50) // Топ 50 доноров
+                .toList();
+
+        List<Map<String, Object>> topDonors = new java.util.ArrayList<>();
+        int rank = 1;
+
+        for (Donor donor : sortedDonors) {
+            Map<String, Object> donorData = new HashMap<>();
+            donorData.put("rank", rank++);
+            donorData.put("donorId", donor.getDonorId());
+            donorData.put("fullName", donor.getFullName());
+            donorData.put("donationCount", donor.getDonationCount());
+            donorData.put("bloodType", donor.getFormattedBloodType());
+            donorData.put("city", donor.getCity());
+            donorData.put("rating", donor.getRating() != null ? donor.getRating() : 0);
+            donorData.put("points", donor.getPoints() != null ? donor.getPoints() : 0);
+            donorData.put("donorLevel", calculateDonorLevel(donor.getDonationCount()));
+            donorData.put("lastDonationDate", donor.getLastDonationDate() != null ? donor.getLastDonationDate().toString() : null);
+
+            topDonors.add(donorData);
+        }
+
+        return ResponseEntity.ok(topDonors);
+    }
+
+    @GetMapping("/current-donor-rank/{userId}")
+    public ResponseEntity<Map<String, Object>> getCurrentDonorRank(@PathVariable Long userId) {
+        Optional<Donor> donorOpt = donorRepository.findByUser_UserId(userId);
+
+        if (donorOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Donor currentDonor = donorOpt.get();
+        List<Donor> allDonors = donorRepository.findAll();
+
+        // Сортируем и находим ранг текущего донора
+        List<Donor> sortedDonors = allDonors.stream()
+                .filter(d -> d.getDonationCount() != null && d.getDonationCount() > 0)
+                .sorted((a, b) -> b.getDonationCount().compareTo(a.getDonationCount()))
+                .toList();
+
+        int rank = 1;
+        for (Donor donor : sortedDonors) {
+            if (donor.getDonorId().equals(currentDonor.getDonorId())) {
+                break;
+            }
+            rank++;
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("rank", rank);
+        response.put("totalDonors", sortedDonors.size());
+        response.put("donationCount", currentDonor.getDonationCount());
+        response.put("donorLevel", calculateDonorLevel(currentDonor.getDonationCount()));
+        response.put("nextRankDonations", getNextRankDonations(currentDonor.getDonationCount()));
+
+        return ResponseEntity.ok(response);
+    }
+
+    private int getNextRankDonations(Integer currentCount) {
+        if (currentCount == null || currentCount < 5) return 5 - currentCount;
+        if (currentCount < 15) return 15 - currentCount;
+        if (currentCount < 25) return 25 - currentCount;
+        return 0;
+    }
+
 }
