@@ -171,7 +171,6 @@ export default function RegisterPage() {
     const handleSendVerificationCode = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Проверка совпадения паролей
         if (baseData.password !== baseData.confirmPassword) {
             setError("Passwords do not match")
             return
@@ -217,11 +216,17 @@ export default function RegisterPage() {
 
         try {
             const requestData = {
-                ...baseData,
+                email: baseData.email,
+                password: baseData.password,
+                confirmPassword: baseData.confirmPassword,
+                phoneNumber: baseData.phoneNumber,
+                role: baseData.role,
                 ...(baseData.role === "DONOR" && { donorData }),
                 ...(baseData.role === "BLOOD_CENTER" && { bloodCenterData }),
                 ...(baseData.role === "MEDICAL_CENTER" && { medicalCenterData }),
             }
+
+            console.log('Request data being sent:', requestData);
 
             const response = await register(requestData)
             const role = response.role
@@ -447,7 +452,6 @@ export default function RegisterPage() {
                                     <PasswordStrength password={baseData.password} />
                                 </div>
 
-                                {/* Confirm Password field */}
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                                         Confirm Password
@@ -520,20 +524,22 @@ export default function RegisterPage() {
                                     <PhoneValidation phone={baseData.phoneNumber} />
                                 </div>
 
-
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="role">I am registering as</Label>
                                     <Select
                                         value={baseData.role}
                                         onValueChange={(value: Role) => handleBaseDataChange("role", value)}
                                     >
-                                        <SelectTrigger id="role" className="w-full">
+                                        <SelectTrigger
+                                            id="role"
+                                            className="w-full bg-white border-border hover:bg-gray-50 focus:bg-white data-[state=open]:bg-white"
+                                        >
                                             <SelectValue placeholder="Select your role" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="DONOR"> Blood Donor</SelectItem>
-                                            <SelectItem value="BLOOD_CENTER">Blood Center</SelectItem>
-                                            <SelectItem value="MEDICAL_CENTER"> Medical Center</SelectItem>
+                                        <SelectContent className="bg-white border-border shadow-lg">
+                                            <SelectItem value="DONOR" className="hover:bg-gray-50 focus:bg-gray-50">Blood Donor</SelectItem>
+                                            <SelectItem value="BLOOD_CENTER" className="hover:bg-gray-50 focus:bg-gray-50">Blood Center</SelectItem>
+                                            <SelectItem value="MEDICAL_CENTER" className="hover:bg-gray-50 focus:bg-gray-50">Medical Center</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -617,7 +623,6 @@ export default function RegisterPage() {
                                 </div>
                             </form>
                         )}
-
 
                         {step === 3 && (
                             <form onSubmit={handleFinalSubmit} className="flex flex-col gap-4">

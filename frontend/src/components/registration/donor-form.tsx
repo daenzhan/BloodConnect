@@ -46,7 +46,6 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
                     )}
                 </Label>
                 <Input
-                    placeholder="Enter your full name"
                     value={data.fullName}
                     onChange={(e) => onChange({ ...data, fullName: e.target.value })}
                     className={getFieldStyle("fullName")}
@@ -96,12 +95,17 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
             <div className="flex flex-col gap-2">
                 <Label>Gender</Label>
                 <Select value={data.gender} onValueChange={(value: Gender) => onChange({ ...data, gender: value })}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select gender" />
+                    <SelectTrigger className="w-full bg-white border-border hover:bg-gray-50 focus:bg-white data-[state=open]:bg-white">
+                        <SelectValue placeholder="" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="MALE">Male</SelectItem>
-                        <SelectItem value="FEMALE">Female</SelectItem>
+                    <SelectContent
+                        position="popper"
+                        className="bg-white border-border shadow-lg"
+                        sideOffset={5}
+                        align="start"
+                    >
+                        <SelectItem value="MALE" className="hover:bg-gray-50 focus:bg-gray-50">Male</SelectItem>
+                        <SelectItem value="FEMALE" className="hover:bg-gray-50 focus:bg-gray-50">Female</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -110,14 +114,19 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
             <div className="flex flex-col gap-2">
                 <Label>Blood Group</Label>
                 <Select value={data.bloodGroup} onValueChange={(value: BloodGroup) => onChange({ ...data, bloodGroup: value })}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select blood group" />
+                    <SelectTrigger className="w-full bg-white border-border hover:bg-gray-50 focus:bg-white data-[state=open]:bg-white">
+                        <SelectValue placeholder="" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="A">A</SelectItem>
-                        <SelectItem value="B">B</SelectItem>
-                        <SelectItem value="AB">AB</SelectItem>
-                        <SelectItem value="O">O</SelectItem>
+                    <SelectContent
+                        position="popper"
+                        className="bg-white border-border shadow-lg"
+                        sideOffset={5}
+                        align="start"
+                    >
+                        <SelectItem value="A" className="hover:bg-gray-50 focus:bg-gray-50">A</SelectItem>
+                        <SelectItem value="B" className="hover:bg-gray-50 focus:bg-gray-50">B</SelectItem>
+                        <SelectItem value="AB" className="hover:bg-gray-50 focus:bg-gray-50">AB</SelectItem>
+                        <SelectItem value="O" className="hover:bg-gray-50 focus:bg-gray-50">O</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -126,12 +135,17 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
             <div className="flex flex-col gap-2">
                 <Label>Rhesus Factor</Label>
                 <Select value={data.rhesusFactor} onValueChange={(value: RhesusFactor) => onChange({ ...data, rhesusFactor: value })}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select rhesus factor" />
+                    <SelectTrigger className="w-full bg-white border-border hover:bg-gray-50 focus:bg-white data-[state=open]:bg-white">
+                        <SelectValue placeholder="" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="POSITIVE">Positive (+)</SelectItem>
-                        <SelectItem value="NEGATIVE">Negative (-)</SelectItem>
+                    <SelectContent
+                        position="popper"
+                        className="bg-white border-border shadow-lg"
+                        sideOffset={5}
+                        align="start"
+                    >
+                        <SelectItem value="POSITIVE" className="hover:bg-gray-50 focus:bg-gray-50">Positive (+)</SelectItem>
+                        <SelectItem value="NEGATIVE" className="hover:bg-gray-50 focus:bg-gray-50">Negative (-)</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -148,7 +162,6 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
                 </Label>
                 <Input
                     type="number"
-                    placeholder="70"
                     value={data.weight || ""}
                     onChange={(e) => onChange({ ...data, weight: parseFloat(e.target.value) || 0 })}
                     min={30}
@@ -170,7 +183,6 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
                 </Label>
                 <Input
                     type="number"
-                    placeholder="175"
                     value={data.height || ""}
                     onChange={(e) => onChange({ ...data, height: parseFloat(e.target.value) || 0 })}
                     min={100}
@@ -191,7 +203,6 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
                     )}
                 </Label>
                 <Input
-                    placeholder="Enter your city"
                     value={data.city}
                     onChange={(e) => onChange({ ...data, city: e.target.value })}
                     className={getFieldStyle("city")}
@@ -210,7 +221,6 @@ export function DonorForm({ data, onChange, onValidChange }: DonorFormProps) {
                     )}
                 </Label>
                 <Input
-                    placeholder="Enter your full address"
                     value={data.address}
                     onChange={(e) => onChange({ ...data, address: e.target.value })}
                     className={getFieldStyle("address")}

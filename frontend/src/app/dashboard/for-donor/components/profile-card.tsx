@@ -2,15 +2,32 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarPlus, ChevronDown, User, Settings, LogOut, Award, MapPin, Loader2 } from "lucide-react";
+import { CalendarPlus, ChevronDown, User, LogOut, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface ProfileCardProps {
     userId?: string | null;
     onLogout?: () => void;
     showBookButton?: boolean;
 }
+
+// Функция для определения уровня донора (как в TopDonorsPage)
+const getDonorLevel = (donationCount: number): string => {
+    if (!donationCount || donationCount === 0) return 'Newcomer';
+    if (donationCount >= 50) return 'Platinum';
+    if (donationCount >= 25) return 'Gold';
+    if (donationCount >= 15) return 'Silver';
+    if (donationCount >= 5) return 'Bronze';
+    return 'Newcomer';
+};
+
+// Функция для форматирования группы крови
+const formatBloodType = (bloodGroup?: string, rhesusFactor?: string): string => {
+    if (!bloodGroup) return "Unknown";
+    const rh = rhesusFactor === 'POSITIVE' ? '+' : rhesusFactor === 'NEGATIVE' ? '-' : '';
+    return bloodGroup + rh;
+};
 
 export function ProfileCard({ userId: propUserId, onLogout, showBookButton = false }: ProfileCardProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +36,6 @@ export function ProfileCard({ userId: propUserId, onLogout, showBookButton = fal
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const searchParams = useSearchParams();
-    const pathname = usePathname();
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
@@ -75,6 +91,10 @@ export function ProfileCard({ userId: propUserId, onLogout, showBookButton = fal
 
         fetchDonorData();
     }, [userId]);
+
+    // Вычисляем уровень на основе количества донаций
+    const calculatedDonorLevel = getDonorLevel(donorData?.donationCount || 0);
+    const formattedBloodType = formatBloodType(donorData?.bloodGroup, donorData?.rhesusFactor);
 
     const initials = donorData?.fullName
         ? donorData.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -139,15 +159,11 @@ export function ProfileCard({ userId: propUserId, onLogout, showBookButton = fal
                     <div className="hidden sm:block text-left">
                         <p className="text-sm font-medium text-gray-900">{donorData?.fullName || "Donor"}</p>
                         <div className="flex items-center gap-2 text-xs">
-                            <span className="text-gray-600">{donorData?.bloodType || "Unknown"}</span>
-                            {donorData?.donorLevel && (
-                                <>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-gradient-to-br from-primary to-primary/80">
-                                        {donorData.donorLevel}
-                                    </span>
-                                </>
-                            )}
+                            <span className="text-gray-600">{formattedBloodType || "Unknown"}</span>
+                            <span className="text-gray-400">•</span>
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-gradient-to-br from-primary to-primary/80">
+                                {calculatedDonorLevel}
+                            </span>
                         </div>
                     </div>
 
@@ -155,67 +171,61 @@ export function ProfileCard({ userId: propUserId, onLogout, showBookButton = fal
                 </button>
 
                 {isOpen && (
-                    <Card className="absolute right-0 top-full mt-2 w-64 p-2 rounded-xl shadow-lg border border-gray-200 bg-white z-50 animate-in fade-in zoom-in duration-200">
-                        <div className="px-3 py-2 border-b border-gray-200 mb-1">
-                            <p className="font-medium text-gray-900">{donorData?.fullName || "Donor"}</p>
-                            <p className="text-xs text-gray-600">{donorData?.bloodType || "Unknown"} Blood Type</p>
-                            {donorData?.city && (
-                                <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {donorData.city}
-                                </p>
-                            )}
+                    <Card className="absolute right-0 top-full mt-2 w-72 p-3 rounded-xl shadow-lg border border-gray-200 bg-white z-50 animate-in fade-in zoom-in duration-200">
+                        {/* Header Section */}
+                        <div className="px-3 py-0 border-b border-gray-200">
+                            <p className="font-semibold text-gray-900">{donorData?.fullName || "Donor"}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-gray-600">{formattedBloodType || "Unknown"} Blood Type</span>
+                                {donorData?.city && (
+                                    <>
+                                        <span className="text-gray-300">•</span>
+                                        <span className="text-xs text-gray-600 flex items-center gap-1">
+                                            <MapPin className="w-3 h-3" />
+                                            {donorData.city}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
-                        {donorData?.donorLevel && (
-                            <div className="px-3 py-1 mb-1">
-                                <span className="text-xs px-2 py-1 rounded-full border-0 text-white bg-gradient-to-br from-primary to-primary/80">
-                                    {donorData.donorLevel}
+                        {/* Badges Section */}
+                        <div className="px-3 py-2 border-b border-gray-100">
+                            <div className="flex flex-wrap gap-2">
+                                <span className="text-xs px-3 py-1.5 rounded-full font-medium text-white bg-gradient-to-br from-primary to-primary/80">
+                                    {calculatedDonorLevel}
                                 </span>
-                            </div>
-                        )}
-
-                        {donorData?.points > 0 && (
-                            <div className="px-3 py-2 mb-1 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg mx-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">Points:</span>
-                                    <span className="font-medium text-primary">{donorData.points}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {donorData?.donorStatus && (
-                            <div className="px-3 py-1 mb-1">
-                                <span className={`text-xs px-2 py-1 rounded-full border-0 text-white ${
-                                    donorData.donorStatus === 'ACTIVE' ? 'bg-green-600' : 'bg-yellow-600'
+                                <span className={`text-xs px-3 py-1.5 rounded-full font-medium text-white ${
+                                    donorData?.donorStatus === 'ACTIVE' ? 'bg-green-600' : 'bg-yellow-600'
                                 }`}>
-                                    Status: {donorData.donorStatus}
+                                    {donorData?.donorStatus || 'ACTIVE'}
                                 </span>
                             </div>
-                        )}
+                        </div>
 
-                        <div className="space-y-1">
+                        {/* Navigation Section */}
+                        <div className="space-y-0 mt-0">
                             <button
                                 onClick={() => handleNavigation(`/dashboard/for-donor?userId=${userId}`)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                             >
-                                <User className="w-4 h-4" />
+                                <User className="w-4 h-4 text-gray-500" />
                                 Dashboard
                             </button>
 
                             <button
                                 onClick={() => handleNavigation(`/dashboard/for-donor/appointments?userId=${userId}`)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                             >
-                                <CalendarPlus className="w-4 h-4" />
+                                <CalendarPlus className="w-4 h-4 text-gray-500" />
                                 My Appointments
                             </button>
 
-                            <hr className="my-1 border-gray-200" />
+                            <hr className="my-2 border-gray-200" />
 
                             <button
                                 onClick={handleLogout}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-red-600"
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg hover:bg-red-50 transition-colors text-red-600"
                             >
                                 <LogOut className="w-4 h-4" />
                                 Logout
