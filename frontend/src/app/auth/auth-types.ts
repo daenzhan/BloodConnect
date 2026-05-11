@@ -38,7 +38,6 @@ export interface BloodCenterData {
 export interface MedicalCenterData {
     medCenterName: string;
     location: string;
-    phone: string;
     licenseFile: File | null;
     directorFullName: string;
     specialization: string;
