@@ -237,7 +237,11 @@ function transformToBackendFormat(frontendData: any): any {
     console.log('Frontend data received in transform:', frontendData);
     console.log('Confirm password value:', frontendData.confirmPassword);
 
+<<<<<<< HEAD
     const { email, password,confirmPassword, phoneNumber, role, donorData, bloodCenterData, medicalCenterData } = frontendData;
+=======
+    const { email, password, confirmPassword, phoneNumber, role, donorData, bloodCenterData, medicalCenterData } = frontendData;
+>>>>>>> 0665e7dac327bb19c8502f460484341b93da4696
 
     const backendData: any = {
         email: email || '',
@@ -280,6 +284,10 @@ function transformToBackendFormat(frontendData: any): any {
         Object.assign(backendData, {
             medCenterName: medicalCenterData.medCenterName || '',
             medCenterLocation: medicalCenterData.location || '',
+<<<<<<< HEAD
+=======
+            medCenterPhone: medicalCenterData.phone || '',
+>>>>>>> 0665e7dac327bb19c8502f460484341b93da4696
             medCenterSpecialization: medicalCenterData.specialization || '',
             medCenterDirectorFullName: medicalCenterData.directorFullName || '',
         });

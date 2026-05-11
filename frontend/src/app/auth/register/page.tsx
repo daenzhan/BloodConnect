@@ -523,7 +523,6 @@ export default function RegisterPage() {
                                     <PhoneValidation phone={baseData.phoneNumber} />
                                 </div>
 
-
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="role">I am registering as</Label>
                                     <Select
@@ -623,7 +622,6 @@ export default function RegisterPage() {
                                 </div>
                             </form>
                         )}
-
 
                         {step === 3 && (
                             <form onSubmit={handleFinalSubmit} className="flex flex-col gap-4">
