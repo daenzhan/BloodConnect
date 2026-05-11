@@ -158,6 +158,7 @@ export async function register(requestData: any): Promise<AuthResponse> {
     try {
         const backendData = transformToBackendFormat(requestData);
         console.log('Transformed data:', JSON.stringify(backendData, null, 2));
+        console.log('Does transformed data have confirmPassword?', backendData.confirmPassword);
         const response = await api.post('/auth/register', backendData);
         console.log('register success:', response.data);
 
@@ -233,51 +234,57 @@ export async function checkPhoneExists(phone: string): Promise<{ exists: boolean
 }
 
 function transformToBackendFormat(frontendData: any): any {
-    const { email, password, phoneNumber, role, donorData, bloodCenterData, medicalCenterData } = frontendData;
+    console.log('Frontend data received in transform:', frontendData);
+    console.log('Confirm password value:', frontendData.confirmPassword);
+
+    const { email, password,confirmPassword, phoneNumber, role, donorData, bloodCenterData, medicalCenterData } = frontendData;
 
     const backendData: any = {
-        email,
-        password,
-        phoneNumber,
-        role,
+        email: email || '',
+        password: password || '',
+        confirmPassword: confirmPassword || '',
+        phoneNumber: phoneNumber || '',
+        role: role || 'DONOR',
     };
+
+    console.log('Backend data after base assignment:', backendData);
 
     if (role === 'DONOR' && donorData) {
         Object.assign(backendData, {
-            fullName: donorData.fullName,
-            birthDate: donorData.birthDate,
-            iin: donorData.iin,
-            weight: donorData.weight,
-            height: donorData.height,
-            bloodGroup: donorData.bloodGroup,
+            fullName: donorData.fullName || '',
+            birthDate: donorData.birthDate || '',
+            iin: donorData.iin || '',
+            weight: donorData.weight || 0,
+            height: donorData.height || 0,
+            bloodGroup: donorData.bloodGroup || 'A',
             rhesusFactor: donorData.rhesusFactor === 'POSITIVE' ? 'Positive' : 'Negative',
-            address: donorData.address,
-            city: donorData.city,
-            gender: donorData.gender,
+            address: donorData.address || '',
+            city: donorData.city || '',
+            gender: donorData.gender || 'MALE',
         });
     }
 
     if (role === 'BLOOD_CENTER' && bloodCenterData) {
         Object.assign(backendData, {
-            bloodCenterName: bloodCenterData.bloodCenterName,
-            bloodCenterLocation: bloodCenterData.location,
-            bloodCenterCity: bloodCenterData.city,
-            bloodCenterSpecialization: bloodCenterData.specialization,
-            bloodCenterDirectorFullName: bloodCenterData.directorFullName,
-            latitude: bloodCenterData.latitude,
-            longitude: bloodCenterData.longitude,
+            bloodCenterName: bloodCenterData.bloodCenterName || '',
+            bloodCenterLocation: bloodCenterData.location || '',
+            bloodCenterCity: bloodCenterData.city || '',
+            bloodCenterSpecialization: bloodCenterData.specialization || '',
+            bloodCenterDirectorFullName: bloodCenterData.directorFullName || '',
+            latitude: bloodCenterData.latitude || 0,
+            longitude: bloodCenterData.longitude || 0,
         });
     }
 
     if (role === 'MEDICAL_CENTER' && medicalCenterData) {
         Object.assign(backendData, {
-            medCenterName: medicalCenterData.medCenterName,
-            medCenterLocation: medicalCenterData.location,
-            medCenterPhone: medicalCenterData.phone,
-            medCenterSpecialization: medicalCenterData.specialization,
-            medCenterDirectorFullName: medicalCenterData.directorFullName,
+            medCenterName: medicalCenterData.medCenterName || '',
+            medCenterLocation: medicalCenterData.location || '',
+            medCenterSpecialization: medicalCenterData.specialization || '',
+            medCenterDirectorFullName: medicalCenterData.directorFullName || '',
         });
     }
 
+    console.log('Final backend data:', backendData);
     return backendData;
 }

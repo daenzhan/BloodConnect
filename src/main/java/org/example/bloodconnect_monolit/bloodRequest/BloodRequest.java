@@ -6,12 +6,14 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
 import org.example.bloodconnect_monolit.medCenter.MedCenter;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.time.LocalDateTime;
 import java.util.Date;
 
 @Entity
 @Table(name = "bloodrequests")
+@CrossOrigin(origins = "http://localhost:3000")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

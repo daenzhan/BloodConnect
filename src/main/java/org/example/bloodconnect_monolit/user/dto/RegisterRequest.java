@@ -68,7 +68,6 @@ public class RegisterRequest {
 
     private String medCenterName;
     private String medCenterLocation;
-    private String medCenterPhone;
     private String medCenterLicenseFile;
     private String medCenterDirectorFullName;
     private String medCenterSpecialization;
@@ -106,8 +105,6 @@ public class RegisterRequest {
     @JsonProperty("isMedicalCenterDataValid")
     public boolean isMedicalCenterDataValid() {
         return medCenterName != null && !medCenterName.trim().isEmpty() &&
-                medCenterLocation != null && !medCenterLocation.trim().isEmpty() &&
-                medCenterPhone != null && !medCenterPhone.trim().isEmpty() &&
-                medCenterPhone.matches("^\\+?[0-9]{10,15}$");
+                medCenterLocation != null && !medCenterLocation.trim().isEmpty();
     }
 }

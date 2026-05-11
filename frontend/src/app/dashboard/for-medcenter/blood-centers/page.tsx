@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input"
 import { MapPin, Search, ExternalLink, Building2, ArrowLeft, AlertCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
+
 
 interface BloodCenter {
     bloodCenterId: number
@@ -24,32 +35,44 @@ export default function BloodCentersPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
     const [error, setError] = useState<string | null>(null)
-
+    const [medCenter, setMedCenter] = useState<any>(null)
     const searchParams = useSearchParams()
     const userId = searchParams.get('userId')
 
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+            return;
+        }
+    }, []);
     useEffect(() => {
         const fetchCenters = async () => {
             try {
                 setError(null)
                 console.log("Fetching blood centers from backend...")
 
+                const headers = getAuthHeaders();
+                if (!headers) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
+
                 const response = await fetch("http://localhost:8080/blood-centers", {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: headers
                 })
+
 
                 console.log("Response status:", response.status)
 
                 if (!response.ok) {
                     if (response.status === 403) {
-                        throw new Error("Access forbidden. Please check CORS configuration on the backend.")
+                        throw new Error("Access forbidden. Please check your authentication.")
                     } else if (response.status === 404) {
                         throw new Error("Blood centers endpoint not found. Please check the backend URL.")
                     } else {
-                        throw new Error(`Failed to fetch blood centers: ${response.status} ${response.statusText}`)
+                        throw new Error(`Failed to fetch blood centers: ${response.status}`)
                     }
                 }
 
@@ -74,6 +97,26 @@ export default function BloodCentersPage() {
 
         fetchCenters()
     }, [])
+
+    useEffect(() => {
+        const fetchMedCenter = async () => {
+            if (!userId) return
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) return
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    setMedCenter(data)
+                }
+            } catch (error) {
+                console.error("Error fetching med center:", error)
+            }
+        }
+        fetchMedCenter()
+    }, [userId])
 
     const filteredCenters = centers.filter(center =>
         center.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -107,25 +150,26 @@ export default function BloodCentersPage() {
     }
 
     return (
-        <div>
-            <div className="mb-6">
-                <Link
-                    href={`/dashboard/for-medcenter?userId=${userId}`}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Dashboard
-                </Link>
-            </div>
-
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-primary" />
+        <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                            <MapPin className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground">Blood Centers</h1>
+                            <p className="text-sm text-muted-foreground">Find and view blood donation centers</p>
+                        </div>
+                    </div>
+                    {medCenter && (
+                        <ProfileCard
+                            name={medCenter.name}
+                            location={medCenter.location}
+                            userId={userId || ""}
+                        />
+                    )}
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Blood centers</h1>
-                </div>
-            </div>
 
             <div className="relative mb-6">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -225,5 +269,6 @@ export default function BloodCentersPage() {
                 </Card>
             )}
         </div>
+            </div>
     )
 }

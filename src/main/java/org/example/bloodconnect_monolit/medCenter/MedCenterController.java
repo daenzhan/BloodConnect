@@ -33,7 +33,6 @@ public class MedCenterController {
                 .map(medCenter -> {
                     medCenter.setName(updatedMedCenter.getName());
                     medCenter.setLocation(updatedMedCenter.getLocation());
-                    medCenter.setPhone(updatedMedCenter.getPhone());
                     medCenter.setDirectorFullName(updatedMedCenter.getDirectorFullName());
                     medCenter.setSpecialization(updatedMedCenter.getSpecialization());
                     medCenter.setLicenseFile(updatedMedCenter.getLicenseFile());

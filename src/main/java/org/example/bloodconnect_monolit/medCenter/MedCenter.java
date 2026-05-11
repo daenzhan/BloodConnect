@@ -29,9 +29,6 @@ public class MedCenter {
     @Column(name = "location", nullable = false)
     private String location;
 
-    @Column(name = "phone", nullable = false)
-    private String phone;
-
     @Column(name = "license_file")
     private String licenseFile;
 

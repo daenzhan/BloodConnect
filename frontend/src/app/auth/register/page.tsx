@@ -88,7 +88,6 @@ export default function RegisterPage() {
     const [medicalCenterData, setMedicalCenterData] = useState<MedicalCenterData>({
         medCenterName: "",
         location: "",
-        phone: "",
         licenseFile: null,
         directorFullName: "",
         specialization: "",
@@ -171,7 +170,6 @@ export default function RegisterPage() {
     const handleSendVerificationCode = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Проверка совпадения паролей
         if (baseData.password !== baseData.confirmPassword) {
             setError("Passwords do not match")
             return
@@ -217,17 +215,23 @@ export default function RegisterPage() {
 
         try {
             const requestData = {
-                ...baseData,
+                email: baseData.email,
+                password: baseData.password,
+                confirmPassword: baseData.confirmPassword,
+                phoneNumber: baseData.phoneNumber,
+                role: baseData.role,
                 ...(baseData.role === "DONOR" && { donorData }),
                 ...(baseData.role === "BLOOD_CENTER" && { bloodCenterData }),
                 ...(baseData.role === "MEDICAL_CENTER" && { medicalCenterData }),
             }
 
+            console.log('Request data being sent:', requestData);
+
             const response = await register(requestData)
             const role = response.role
             const userId = response.userId
 
-            if (role === "DONOR") router.push("/dashboard/for-donor")
+            if (role === "DONOR") router.push(`/dashboard/for-donor?userId=${userId}`)
             else if (role === "BLOOD_CENTER") router.push(`/dashboard/for-bloodcenter?userId=${userId}`)
             else if (role === "MEDICAL_CENTER") router.push(`/dashboard/for-medcenter?userId=${userId}`)
             else router.push("/dashboard")
@@ -447,7 +451,6 @@ export default function RegisterPage() {
                                     <PasswordStrength password={baseData.password} />
                                 </div>
 
-                                {/* Confirm Password field */}
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                                         Confirm Password
@@ -527,13 +530,16 @@ export default function RegisterPage() {
                                         value={baseData.role}
                                         onValueChange={(value: Role) => handleBaseDataChange("role", value)}
                                     >
-                                        <SelectTrigger id="role" className="w-full">
+                                        <SelectTrigger
+                                            id="role"
+                                            className="w-full bg-white border-border hover:bg-gray-50 focus:bg-white data-[state=open]:bg-white"
+                                        >
                                             <SelectValue placeholder="Select your role" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="DONOR"> Blood Donor</SelectItem>
-                                            <SelectItem value="BLOOD_CENTER">Blood Center</SelectItem>
-                                            <SelectItem value="MEDICAL_CENTER"> Medical Center</SelectItem>
+                                        <SelectContent className="bg-white border-border shadow-lg">
+                                            <SelectItem value="DONOR" className="hover:bg-gray-50 focus:bg-gray-50">Blood Donor</SelectItem>
+                                            <SelectItem value="BLOOD_CENTER" className="hover:bg-gray-50 focus:bg-gray-50">Blood Center</SelectItem>
+                                            <SelectItem value="MEDICAL_CENTER" className="hover:bg-gray-50 focus:bg-gray-50">Medical Center</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -631,8 +637,11 @@ export default function RegisterPage() {
                                 {baseData.role === "BLOOD_CENTER" && (
                                     <BloodCenterForm data={bloodCenterData} onChange={setBloodCenterData} />
                                 )}
-                                {baseData.role === "MEDICAL_CENTER" && (
-                                    <MedicalCenterForm data={medicalCenterData} onChange={setMedicalCenterData} />
+                                {baseData.role === "MEDICAL_CENTER" && (<MedicalCenterForm
+                                        data={medicalCenterData}
+                                        onChange={setMedicalCenterData}
+                                        phoneNumber={baseData.phoneNumber}
+                                    />
                                 )}
 
                                 <div className="mt-4 flex gap-3">

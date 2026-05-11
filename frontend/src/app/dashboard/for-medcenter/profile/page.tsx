@@ -5,15 +5,24 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Building2, MapPin, Phone, FileText, Save, Edit2, Calendar, ArrowLeft } from "lucide-react"
+import {User, Building2, MapPin, Phone, FileText, Save, Edit2, Calendar, ArrowLeft, Loader2} from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
 
 interface MedCenterProfile {
     medCenterId: number
     name: string
     location: string
-    phone: string
     licenseFile?: string
     directorFullName?: string
     specialization?: string
@@ -33,6 +42,14 @@ export default function ProfilePage() {
     const userId = searchParams.get('userId')
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+            return;
+        }
+    }, []);
+
+    useEffect(() => {
         if (!userId) {
             setError("User ID not provided in URL")
             setIsLoading(false)
@@ -41,9 +58,24 @@ export default function ProfilePage() {
 
         const fetchProfile = async () => {
             try {
+                const headers = getAuthHeaders();
+                if (!headers) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
                 console.log("Fetching profile for user ID:", userId)
 
-                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/auth/login';
+                    return null;
+                }
+
 
                 console.log("Response status:", response.status)
 
@@ -78,21 +110,31 @@ export default function ProfilePage() {
         setError(null)
 
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
+
             console.log("Updating profile for user ID:", userId)
 
             const response = await fetch(`http://localhost:8080/medcenter/update/${profile.medCenterId}`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: headers,
                 body: JSON.stringify({
                     name: editedProfile.name,
                     location: editedProfile.location,
-                    phone: editedProfile.phone,
                     directorFullName: editedProfile.directorFullName,
                     specialization: editedProfile.specialization
                 })
             })
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
+                return null;
+            }
 
             if (response.ok) {
                 const updatedData = await response.json()
@@ -124,7 +166,7 @@ export default function ProfilePage() {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
                     <p className="text-muted-foreground">Loading profile...</p>
                 </div>
             </div>
@@ -146,17 +188,9 @@ export default function ProfilePage() {
     }
 
     return (
+        <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+            <div className="max-w-3xl mx-auto">
         <div className="max-w-2xl mx-auto">
-            <div className="mb-6">
-                <Link
-                    href={`/dashboard/for-medcenter?userId=${userId}`}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to dashboard
-                </Link>
-            </div>
-
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -207,9 +241,18 @@ export default function ProfilePage() {
                         </Button>
                     </div>
                 )}
+
+                {profile && (
+                    <ProfileCard
+                        name={profile.name}
+                        location={profile.location}
+                        userId={userId || ""}
+                    />
+                )}
             </div>
 
-            <Card className="p-6 rounded-2xl border border-border mb-6">
+
+            <Card className="p-6 rounded-3xl border border-border mb-6">
                 <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                     <Building2 className="w-5 h-5 text-primary" />
                     Center information
@@ -247,22 +290,6 @@ export default function ProfilePage() {
                         )}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="phone" className="flex items-center gap-2">
-                            <Phone className="w-4 h-4" />
-                            Phone number
-                        </Label>
-                        {isEditing ? (
-                            <Input
-                                id="phone"
-                                value={editedProfile.phone || ""}
-                                onChange={(e) => setEditedProfile({ ...editedProfile, phone: e.target.value })}
-                                className="rounded-xl"
-                            />
-                        ) : (
-                            <p className="text-foreground p-3 bg-muted/50 rounded-xl">{profile.phone}</p>
-                        )}
-                    </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="specialization">Specialization</Label>
@@ -323,6 +350,8 @@ export default function ProfilePage() {
                     </div>
                 </div>
             </Card>
+        </div>
+            </div>
         </div>
     )
 }

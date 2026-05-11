@@ -139,7 +139,6 @@ public class UserService implements UserDetailsService {
         medCenter.setUser(user);
         medCenter.setName(request.getMedCenterName());
         medCenter.setLocation(request.getMedCenterLocation());
-        medCenter.setPhone(request.getMedCenterPhone());
         medCenter.setLicenseFile(request.getMedCenterLicenseFile());
         medCenter.setDirectorFullName(request.getMedCenterDirectorFullName());
         medCenter.setSpecialization(request.getMedCenterSpecialization());

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { Card } from "@/components/ui/card"
 import { FileText, ClipboardList, MapPin, User } from "lucide-react"

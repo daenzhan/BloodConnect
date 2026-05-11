@@ -1,19 +1,21 @@
-"use client"
+"use client";
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { MedicalCenterData } from "@/app/auth/auth-types"
+import {Phone} from "lucide-react";
 
 interface MedicalCenterFormProps {
     data: MedicalCenterData
     onChange: (data: MedicalCenterData) => void
+    phoneNumber?: string
 }
 
-export function MedicalCenterForm({ data, onChange }: MedicalCenterFormProps) {
+export function MedicalCenterForm({ data, onChange, phoneNumber  }: MedicalCenterFormProps) {
     return (
         <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="medCenterName">Medical Center Name</Label>
+                <Label htmlFor="medCenterName">Medical Center Name *</Label>
                 <Input
                     id="medCenterName"
                     placeholder="Enter medical center name"
@@ -24,7 +26,7 @@ export function MedicalCenterForm({ data, onChange }: MedicalCenterFormProps) {
             </div>
 
             <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="directorFullName">Director Full Name</Label>
+                <Label htmlFor="directorFullName">Director Full Name *</Label>
                 <Input
                     id="directorFullName"
                     placeholder="Enter director's full name"
@@ -35,24 +37,12 @@ export function MedicalCenterForm({ data, onChange }: MedicalCenterFormProps) {
             </div>
 
             <div className="flex flex-col gap-2">
-                <Label htmlFor="location">Location / Address</Label>
+                <Label htmlFor="location">Location / Address *</Label>
                 <Input
                     id="location"
                     placeholder="Enter full address"
                     value={data.location}
                     onChange={(e) => onChange({ ...data, location: e.target.value })}
-                    required
-                />
-            </div>
-
-            <div className="flex flex-col gap-2">
-                <Label htmlFor="phone">Contact Phone</Label>
-                <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+7 (777) 123-4567"
-                    value={data.phone}
-                    onChange={(e) => onChange({ ...data, phone: e.target.value })}
                     required
                 />
             </div>
@@ -64,9 +54,23 @@ export function MedicalCenterForm({ data, onChange }: MedicalCenterFormProps) {
                     placeholder="e.g., General surgery, Oncology"
                     value={data.specialization}
                     onChange={(e) => onChange({ ...data, specialization: e.target.value })}
-                    required
                 />
             </div>
+
+            {phoneNumber && (
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                    <Label className="flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        Contact Phone (from account)
+                    </Label>
+                    <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                        {phoneNumber}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        This phone number is taken from your account information
+                    </p>
+                </div>
+            )}
 
             <div className="flex flex-col gap-2 sm:col-span-2">
                 <Label htmlFor="licenseFile">License Document</Label>

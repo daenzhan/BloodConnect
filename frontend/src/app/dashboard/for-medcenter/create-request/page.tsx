@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import {useEffect, useState} from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,9 +13,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { FileText, ArrowLeft, CheckCircle } from "lucide-react"
+import {FileText, ArrowLeft, CheckCircle, Loader2, ClipboardList, Plus} from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
 
 const bloodGroups = ["A", "B", "AB", "O"]
 
@@ -57,6 +67,7 @@ export default function CreateRequestPage() {
     const [isCustomVolume, setIsCustomVolume] = useState(false)
     const [customVolumeValue, setCustomVolumeValue] = useState("")
     const [customVolumeUnit, setCustomVolumeUnit] = useState("ml")
+    const [medCenter, setMedCenter] = useState<any>(null)
 
     const [formData, setFormData] = useState({
         componentType: "",
@@ -69,7 +80,20 @@ export default function CreateRequestPage() {
 
     const fetchMedCenterId = async (): Promise<number | null> => {
         try {
-            const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
+            const headers = getAuthHeaders();
+            if (!headers) return null;
+
+            const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                headers: headers
+            })
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
+                return null;
+            }
+
             if (response.ok) {
                 const data = await response.json()
                 return data.medCenterId
@@ -90,6 +114,12 @@ export default function CreateRequestPage() {
             setError("User ID not found")
             setIsSubmitting(false)
             return
+        }
+
+        const headers = getAuthHeaders();
+        if (!headers) {
+            window.location.href = '/auth/login';
+            return;
         }
 
         const fetchedMedCenterId = await fetchMedCenterId()
@@ -122,15 +152,18 @@ export default function CreateRequestPage() {
                 medCenter: { medCenterId: fetchedMedCenterId }
             }
 
-            console.log("Submitting request:", requestData)
-
             const response = await fetch("http://localhost:8080/blood-requests/create", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: headers,
                 body: JSON.stringify(requestData),
             })
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error("Failed to create request")
@@ -148,19 +181,39 @@ export default function CreateRequestPage() {
         }
     }
 
+    useEffect(() => {
+        const fetchMedCenter = async () => {
+            if (!userId) return
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) return
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    setMedCenter(data)
+                }
+            } catch (error) {
+                console.error("Error fetching med center:", error)
+            }
+        }
+        fetchMedCenter()
+    }, [userId])
+
     if (isSuccess) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <Card className="p-8 text-center max-w-md rounded-2xl border border-border">
-                    <div className="w-16 h-16 bg-chart-2/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle className="w-8 h-8 text-chart-2" />
+                <Card className="p-8 text-center max-w-md">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="w-8 h-8 text-green-600" />
                     </div>
-                    <h2 className="text-xl font-bold text-foreground mb-2">Request created!</h2>
-                    <p className="text-muted-foreground mb-4">
+                    <h2 className="text-xl font-bold mb-2">Request created!</h2>
+                    <p className="text-gray-600 mb-4">
                         Your blood request has been submitted successfully.
                     </p>
                     <Link href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}>
-                        <Button className="bg-primary hover:bg-primary/90 rounded-xl">
+                        <Button className="bg-red-600 hover:bg-red-700 text-white">
                             View my requests
                         </Button>
                     </Link>
@@ -170,158 +223,145 @@ export default function CreateRequestPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-4">
-            <div className="mb-6">
-                <Link
-                    href={`/dashboard/for-medcenter?userId=${userId}`}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to dashboard
-                </Link>
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-primary" />
+        <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col sm:flex-row  sm:justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-bold text-foreground">Create Blood Request</h1>
+                            <p className="text-sm text-muted-foreground">Submit a new blood request to blood centers</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">Create blood request</h1>
-                    </div>
+                    {medCenter && (
+                        <ProfileCard
+                            name={medCenter.name}
+                            location={medCenter.location}
+                            userId={userId || ""}
+                        />
+                    )}
                 </div>
             </div>
-
-            <Card className="p-6 rounded-2xl border border-border">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="componentType" className="text-sm font-medium">
-                            Component type <span className="text-red-500">*</span>
-                        </Label>
-                        <Select
-                            value={formData.componentType}
-                            onValueChange={(value) => setFormData({ ...formData, componentType: value })}
-                            required
-                        >
-                            <SelectTrigger id="componentType" className="w-full h-11 bg-white">
-                                <SelectValue placeholder="Select blood component" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                                {componentTypes.map((type) => (
-                                    <SelectItem
-                                        key={type.value}
-                                        value={type.value}
-                                        className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
-                                    >
-                                        {type.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="bloodGroup" className="text-sm font-medium">
-                                Blood group <span className="text-red-500">*</span>
-                            </Label>
-                            <Select
-                                value={formData.bloodGroup}
-                                onValueChange={(value) => setFormData({ ...formData, bloodGroup: value })}
-                                required
-                            >
-                                <SelectTrigger id="bloodGroup" className="w-full h-11 bg-white">
-                                    <SelectValue placeholder="Select blood group" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                                    {bloodGroups.map((group) => (
-                                        <SelectItem
-                                            key={group}
-                                            value={group}
-                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
-                                        >
-                                            {group}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+            <div className="max-w-4xl mx-auto">
+                <Card className="p-4 md:p-6 rounded-2xl border border-border">
+                    <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
 
                         <div className="space-y-2">
-                            <Label htmlFor="rhesusFactor" className="text-sm font-medium">
-                                Rhesus factor <span className="text-red-500">*</span>
+                            <Label htmlFor="componentType" className="text-sm font-medium">
+                                Component type <span className="text-red-500">*</span>
                             </Label>
                             <Select
-                                value={formData.rhesusFactor}
-                                onValueChange={(value) => setFormData({ ...formData, rhesusFactor: value })}
+                                value={formData.componentType}
+                                onValueChange={(value) => setFormData({ ...formData, componentType: value })}
                                 required
                             >
-                                <SelectTrigger id="rhesusFactor" className="w-full h-11 bg-white">
-                                    <SelectValue placeholder="Select Rh factor" />
+                                <SelectTrigger id="componentType" className="w-full h-11 bg-white">
+                                    <SelectValue placeholder="Select blood component" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                                    {rhesusFactors.map((rh) => (
-                                        <SelectItem
-                                            key={rh.value}
-                                            value={rh.value}
-                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
-                                        >
-                                            {rh.label}
+                                <SelectContent>
+                                    {componentTypes.map((type) => (
+                                        <SelectItem key={type.value} value={type.value}>
+                                            {type.label}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
-                    </div>
 
-                    <div className="space-y-4">
-                        <Label className="text-sm font-medium">
-                            Volume <span className="text-red-500">*</span>
-                        </Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="bloodGroup" className="text-sm font-medium">
+                                    Blood group <span className="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    value={formData.bloodGroup}
+                                    onValueChange={(value) => setFormData({ ...formData, bloodGroup: value })}
+                                    required
+                                >
+                                    <SelectTrigger id="bloodGroup" className="w-full h-11 bg-white">
+                                        <SelectValue placeholder="Select blood group" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {bloodGroups.map((group) => (
+                                            <SelectItem key={group} value={group}>
+                                                {group}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                        <div className="flex gap-2 mb-2">
-                            <Button
-                                type="button"
-                                variant={!isCustomVolume ? "default" : "outline"}
-                                className={`flex-1 h-11 ${!isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
-                                onClick={() => {
-                                    setIsCustomVolume(false)
-                                    setCustomVolumeValue("")
-                                }}
-                            >
-                                Select from list
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={isCustomVolume ? "default" : "outline"}
-                                className={`flex-1 h-11 ${isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
-                                onClick={() => setIsCustomVolume(true)}
-                            >
-                                Enter custom
-                            </Button>
+                            <div className="space-y-2">
+                                <Label htmlFor="rhesusFactor" className="text-sm font-medium">
+                                    Rhesus factor <span className="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    value={formData.rhesusFactor}
+                                    onValueChange={(value) => setFormData({ ...formData, rhesusFactor: value })}
+                                    required
+                                >
+                                    <SelectTrigger id="rhesusFactor" className="w-full h-11 bg-white">
+                                        <SelectValue placeholder="Select Rh factor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {rhesusFactors.map((rh) => (
+                                            <SelectItem key={rh.value} value={rh.value}>
+                                                {rh.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
-                        {!isCustomVolume ? (
-                            <Select
-                                value={formData.volume}
-                                onValueChange={(value) => setFormData({ ...formData, volume: value })}
-                                required={!isCustomVolume}
-                            >
-                                <SelectTrigger id="volume" className="w-full h-11 bg-white">
-                                    <SelectValue placeholder="Select volume" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-                                    {volumeOptions.map((vol) => (
-                                        <SelectItem
-                                            key={vol.value}
-                                            value={vol.value}
-                                            className="cursor-pointer py-3 hover:bg-gray-100 focus:bg-gray-100 bg-white text-gray-900"
-                                        >
-                                            {vol.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        ) : (
-                            <div className="space-y-3">
-                                <div className="flex gap-3">
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">
+                                Volume <span className="text-red-500">*</span>
+                            </Label>
+
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <Button
+                                    type="button"
+                                    variant={!isCustomVolume ? "default" : "outline"}
+                                    className={`flex-1 h-11 ${!isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
+                                    onClick={() => {
+                                        setIsCustomVolume(false)
+                                        setCustomVolumeValue("")
+                                    }}
+                                >
+                                    Select from list
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={isCustomVolume ? "default" : "outline"}
+                                    className={`flex-1 h-11 ${isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
+                                    onClick={() => setIsCustomVolume(true)}
+                                >
+                                    Enter custom
+                                </Button>
+                            </div>
+
+                            {!isCustomVolume ? (
+                                <Select
+                                    value={formData.volume}
+                                    onValueChange={(value) => setFormData({ ...formData, volume: value })}
+                                    required={!isCustomVolume}
+                                >
+                                    <SelectTrigger id="volume" className="w-full h-11 bg-white">
+                                        <SelectValue placeholder="Select volume" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-60 overflow-y-auto">
+                                        {volumeOptions.map((vol) => (
+                                            <SelectItem key={vol.value} value={vol.value}>
+                                                {vol.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <div className="flex-1">
                                         <Input
                                             id="customVolume"
@@ -338,7 +378,7 @@ export default function CreateRequestPage() {
                                             required={isCustomVolume}
                                         />
                                     </div>
-                                    <div className="w-32">
+                                    <div className="w-full sm:w-32">
                                         <Select
                                             value={customVolumeUnit}
                                             onValueChange={setCustomVolumeUnit}
@@ -346,13 +386,9 @@ export default function CreateRequestPage() {
                                             <SelectTrigger className="w-full h-11 bg-white">
                                                 <SelectValue placeholder="Unit" />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                                            <SelectContent>
                                                 {unitOptions.map((unit) => (
-                                                    <SelectItem
-                                                        key={unit.value}
-                                                        value={unit.value}
-                                                        className="cursor-pointer py-3 hover:bg-gray-100 bg-white text-gray-900"
-                                                    >
+                                                    <SelectItem key={unit.value} value={unit.value}>
                                                         {unit.label}
                                                     </SelectItem>
                                                 ))}
@@ -360,78 +396,83 @@ export default function CreateRequestPage() {
                                         </Select>
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="flex gap-3 text-sm text-muted-foreground">
+                            {isCustomVolume && (
+                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                                     <span>Examples:</span>
                                     <span className="bg-gray-100 px-2 py-1 rounded">450ml</span>
                                     <span className="bg-gray-100 px-2 py-1 rounded">0.5L</span>
                                     <span className="bg-gray-100 px-2 py-1 rounded">1L</span>
                                     <span className="bg-gray-100 px-2 py-1 rounded">750ml</span>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Deadline */}
+                        <div className="space-y-2">
+                            <Label htmlFor="deadline" className="text-sm font-medium">
+                                Deadline <span className="text-gray-400 text-xs">(Optional)</span>
+                            </Label>
+                            <Input
+                                id="deadline"
+                                type="datetime-local"
+                                value={formData.deadline}
+                                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                                className="rounded-xl w-full h-11 px-4 border border-input bg-white"
+                            />
+                        </div>
+
+                        {/* Comment */}
+                        <div className="space-y-2">
+                            <Label htmlFor="comment" className="text-sm font-medium">
+                                Additional comments <span className="text-gray-400 text-xs">(Optional)</span>
+                            </Label>
+                            <Textarea
+                                id="comment"
+                                placeholder="Any additional information about the request..."
+                                rows={4}
+                                value={formData.comment}
+                                onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                                className="rounded-xl w-full resize-none p-4 border border-input bg-white"
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                                {error}
                             </div>
                         )}
-                    </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="deadline" className="text-sm font-medium">
-                            Deadline <span className="text-gray-400 text-xs">(Optional)</span>
-                        </Label>
-                        <Input
-                            id="deadline"
-                            type="datetime-local"
-                            value={formData.deadline}
-                            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                            className="rounded-xl w-full h-11 px-4 border border-input bg-white"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="comment" className="text-sm font-medium">
-                            Additional comments <span className="text-gray-400 text-xs">(Optional)</span>
-                        </Label>
-                        <Textarea
-                            id="comment"
-                            placeholder="Any additional information about the request..."
-                            rows={4}
-                            value={formData.comment}
-                            onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                            className="rounded-xl w-full resize-none p-4 border border-input bg-white"
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex gap-4 pt-4">
-                        <Link href={`/dashboard/for-medcenter?userId=${userId}`} className="flex-1">
+                        {/* Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                            <Link href={`/dashboard/for-medcenter?userId=${userId}`} className="sm:flex-1">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full rounded-xl h-12 border-2 hover:bg-gray-50 transition-all bg-white"
+                                >
+                                    Cancel
+                                </Button>
+                            </Link>
                             <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full rounded-xl h-12 border-2 hover:bg-gray-50 transition-all bg-white"
+                                type="submit"
+                                className="sm:flex-1 bg-primary hover:bg-primary/90 rounded-xl h-12 transition-all text-white"
+                                disabled={isSubmitting || !formData.componentType || !formData.bloodGroup || !formData.rhesusFactor || (!formData.volume && !customVolumeValue)}
                             >
-                                Cancel
+                                {isSubmitting ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Submitting...
+                                    </span>
+                                ) : (
+                                    "Submit request"
+                                )}
                             </Button>
-                        </Link>
-                        <Button
-                            type="submit"
-                            className="flex-1 bg-primary hover:bg-primary/90 rounded-xl h-12 transition-all text-white"
-                            disabled={isSubmitting || !formData.componentType || !formData.bloodGroup || !formData.rhesusFactor || (!formData.volume && !customVolumeValue)}
-                        >
-                            {isSubmitting ? (
-                                <span className="flex items-center justify-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    Submitting...
-                                </span>
-                            ) : (
-                                "Submit request"
-                            )}
-                        </Button>
-                    </div>
-                </form>
-            </Card>
+                        </div>
+                    </form>
+                </Card>
+            </div>
         </div>
     )
 }

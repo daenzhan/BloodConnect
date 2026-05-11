@@ -30,6 +30,16 @@ import {
 import { ClipboardList, Plus, Clock, CheckCircle, XCircle, AlertCircle, Filter, MoreVertical, Edit, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
+import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
 
 interface BloodRequest {
     bloodRequestId: number
@@ -104,10 +114,18 @@ export default function MyRequestsPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
-
+    const [medCenter, setMedCenter] = useState<any>(null)
     const searchParams = useSearchParams()
     const router = useRouter()
     const userId = searchParams.get('userId')
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+            return;
+        }
+    }, []);
 
     useEffect(() => {
         const fetchMedCenterAndRequests = async () => {
@@ -117,12 +135,40 @@ export default function MyRequestsPage() {
             }
 
             try {
-                const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`)
+                const headers = getAuthHeaders();
+                if (!headers) {
+                    window.location.href = '/auth/login';
+                    return;
+                }
+
+                const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+
+                if (centerResponse.status === 401 || centerResponse.status === 403) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/auth/login';
+                    return null;
+                }
+
+
                 if (centerResponse.ok) {
                     const centerData = await centerResponse.json()
                     const fetchedMedCenterId = centerData.medCenterId
 
-                    const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${fetchedMedCenterId}`)
+                    const requestsResponse = await fetch(`http://localhost:8080/blood-requests/medcenter/${fetchedMedCenterId}`, {
+                        headers: headers
+                    })
+
+                    if (centerResponse.status === 401 || centerResponse.status === 403) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        window.location.href = '/auth/login';
+                        return null;
+                    }
+
+
                     if (requestsResponse.ok) {
                         const data = await requestsResponse.json()
                         setRequests(data)
@@ -142,14 +188,49 @@ export default function MyRequestsPage() {
         fetchMedCenterAndRequests()
     }, [userId])
 
+    useEffect(() => {
+        const fetchMedCenter = async () => {
+            if (!userId) return
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) return
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    setMedCenter(data)
+                }
+            } catch (error) {
+                console.error("Error fetching med center:", error)
+            }
+        }
+        fetchMedCenter()
+    }, [userId])
+
     const handleDelete = async () => {
         if (!selectedRequest) return
 
         setIsDeleting(true)
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
+
             const response = await fetch(`http://localhost:8080/blood-requests/${selectedRequest.bloodRequestId}`, {
-                method: "DELETE"
+                method: "DELETE",
+                headers: headers
             })
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
+                return null;
+            }
+
 
             if (response.ok) {
                 setRequests(requests.filter(r => r.bloodRequestId !== selectedRequest.bloodRequestId))
@@ -167,9 +248,24 @@ export default function MyRequestsPage() {
 
     const handleStatusUpdate = async (requestId: number, newStatus: string) => {
         try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
+
             const response = await fetch(`http://localhost:8080/blood-requests/${requestId}/status?status=${newStatus}`, {
-                method: "PUT"
+                method: "PUT",
+                headers: headers
             })
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/auth/login';
+                return null;
+            }
+
 
             if (response.ok) {
                 setRequests(requests.map(r =>
@@ -216,6 +312,8 @@ export default function MyRequestsPage() {
     }
 
     return (
+        <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -226,12 +324,21 @@ export default function MyRequestsPage() {
                         <h1 className="text-2xl font-bold text-foreground">My requests</h1>
                     </div>
                 </div>
-                <Link href={`/dashboard/for-medcenter/create-request?userId=${userId}`}>
-                    <Button className="bg-primary hover:bg-primary/90 gap-2 rounded-xl">
-                        <Plus className="w-4 h-4" />
-                        New request
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                    <Link href={`/dashboard/for-medcenter/create-request?userId=${userId}`}>
+                        <Button className="bg-primary hover:bg-primary/90 gap-2 rounded-xl">
+                            <Plus className="w-4 h-4" />
+                            New request
+                        </Button>
+                    </Link>
+                    {medCenter && (
+                        <ProfileCard
+                            name={medCenter.name}
+                            location={medCenter.location}
+                            userId={userId || ""}
+                        />
+                    )}
+            </div>
             </div>
 
             <div className="flex items-center gap-4 mb-6">
@@ -415,6 +522,8 @@ export default function MyRequestsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+        </div>
+            </div>
         </div>
     )
 }

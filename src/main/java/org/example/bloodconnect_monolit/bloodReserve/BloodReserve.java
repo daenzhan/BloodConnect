@@ -18,13 +18,13 @@ public class BloodReserve {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bloodReserveId;
 
-//    @Column(nullable = false)
+    //    @Column(nullable = false)
     private String bloodGroup;
 
-//    @Column(nullable = false)
+    //    @Column(nullable = false)
     private String rhesusFactor;
 
-//    @Column(nullable = false)
+    //    @Column(nullable = false)
     private Integer quantity;
 
     @ManyToOne

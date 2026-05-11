@@ -1,22 +1,35 @@
 import { Card } from "@/components/ui/card"
 import { Droplet, Heart, Users, Award } from "lucide-react"
 
-// Описываем, какие данные компонент ожидает получить
 interface DonationStatsProps {
     total_donations: number;
     lives_saved: number;
     blood_type: string;
-    donor_level: string;
+    donor_level?: string; // Сделаем опциональным
+}
+
+// Функция для определения уровня (как в TopDonorsPage)
+const getDonorLevel = (donationCount: number): string => {
+    if (donationCount >= 50) return 'Platinum'
+    if (donationCount >= 25) return 'Gold'
+    if (donationCount >= 15) return 'Silver'
+    if (donationCount >= 5) return 'Bronze'
+    return 'Newcomer'  // 1-4 донации = Newcomer
 }
 
 export function DonationStats({
-                                  total_donations,
-                                  lives_saved,
-                                  blood_type,
+                                  total_donations = 0,
+                                  lives_saved = 0,
+                                  blood_type = "Unknown",
                                   donor_level
                               }: DonationStatsProps) {
 
-    // Формируем массив данных динамически из полученных пропсов
+    // ВЫЧИСЛЯЕМ УРОВЕНЬ НА ФРОНТЕНДЕ, игнорируя то, что пришло с бэкенда
+    const calculatedLevel = getDonorLevel(total_donations);
+
+    // Используем вычисленный уровень вместо переданного
+    const finalDonorLevel = calculatedLevel;
+
     const stats_items = [
         {
             icon: Droplet,
@@ -28,7 +41,7 @@ export function DonationStats({
         {
             icon: Heart,
             label: "Lives Saved",
-            value: lives_saved,
+            value: lives_saved || total_donations * 3,
             color: "text-chart-2",
             bg: "bg-chart-2/10",
         },
@@ -42,7 +55,7 @@ export function DonationStats({
         {
             icon: Award,
             label: "Donor Level",
-            value: donor_level,
+            value: finalDonorLevel,  // Используем вычисленный уровень
             color: "text-chart-4",
             bg: "bg-chart-4/10",
         },
@@ -63,7 +76,9 @@ export function DonationStats({
                             <div className={`w-8 h-8 rounded-lg ${item.bg} flex items-center justify-center mb-2`}>
                                 <Icon className={`w-4 h-4 ${item.color}`} />
                             </div>
-                            <p className="text-lg font-bold text-foreground">{item.value}</p>
+                            <p className="text-lg font-bold text-foreground">
+                                {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
+                            </p>
                             <p className="text-xs text-muted-foreground">{item.label}</p>
                         </div>
                     )

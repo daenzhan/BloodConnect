@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import '../../globals.css'
+import {BloodCenterSidebar} from "@/app/dashboard/for-bloodcenter/components/sidebar";
 
 const geist = Geist({
     subsets: ["latin"],
@@ -37,14 +38,14 @@ export const metadata: Metadata = {
 }
 
 export default function BloodCenterLayout({
-                                       children,
-                                   }: Readonly<{
+                                              children,
+                                          }: Readonly<{
     children: React.ReactNode
 }>) {
     return (
-        <div className="flex min-h-screen bg-background">
-
-            <main className="flex-1 overflow-auto">
+        <div className="min-h-screen bg-background">
+            <BloodCenterSidebar userId={null} />
+            <main>
                 {children}
             </main>
         </div>

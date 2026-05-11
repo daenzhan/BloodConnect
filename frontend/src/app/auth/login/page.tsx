@@ -72,15 +72,18 @@ export default function LoginPage() {
         try {
             const response = await login(formData.email, formData.password);
             const role = response.role;
+            const userId = response.userId;
+
+            console.log("Login response:", { role, userId });
 
             if (role === "DONOR") {
-                router.push("/dashboard/for-donor");
+                router.push(`/dashboard/for-donor?userId=${userId}`);
             } else if (role === "BLOOD_CENTER") {
-                router.push("/dashboard/for-bloodcenter");
+                router.push(`/dashboard/for-bloodcenter?userId=${userId}`);
             } else if (role === "MEDICAL_CENTER") {
-                router.push("/dashboard/for-medcenter");
+                router.push(`/dashboard/for-medcenter?userId=${userId}`);
             } else if (role === "ADMIN") {
-                router.push("/admin/dashboard");
+                router.push(`/admin/dashboard?userId=${userId}`);
             } else {
                 router.push("/dashboard");
             }

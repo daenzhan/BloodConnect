@@ -45,9 +45,9 @@ export function Sidebar() {
 
     if (!mounted) {
         return (
-            <aside className="fixed top-0 left-0 z-30 hidden md:flex flex-col w-20 lg:w-64 h-screen bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
-                <div className="p-4 lg:p-6">
-                    <div className="flex items-center gap-3">
+            <aside className="fixed top-0 left-0 z-30 flex flex-col w-16 lg:w-64 h-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg transition-all duration-300">
+                <div className="p-4">
+                    <div className="flex items-center justify-center lg:justify-start gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                             <Heart className="w-6 h-6 text-white" fill="currentColor" />
                         </div>
@@ -59,9 +59,10 @@ export function Sidebar() {
     }
 
     return (
-        <aside className="fixed top-0 left-0 z-30 hidden md:flex flex-col w-20 lg:w-64 h-screen bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
-            <div className="flex-shrink-0 p-4 lg:p-6">
-                <div className="flex items-center gap-3">
+        <aside className="fixed top-0 left-0 z-30 flex flex-col w-16 lg:w-64 h-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg transition-all duration-300">
+            {/* Logo */}
+            <div className="flex-shrink-0 p-4">
+                <div className="flex items-center justify-center lg:justify-start gap-3">
                     <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                         <Heart className="w-6 h-6 text-white" fill="currentColor" />
                     </div>
@@ -69,7 +70,8 @@ export function Sidebar() {
                 </div>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-2 lg:px-4 py-6">
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto px-2 py-4 custom-scrollbar">
                 <ul className="space-y-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
@@ -80,8 +82,7 @@ export function Sidebar() {
                                 <Link
                                     href={item.href}
                                     className={cn(
-                                        "flex items-center gap-3 px-3 py-3 rounded-xl transition-all",
-                                        "justify-center lg:justify-start group",
+                                        "flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl transition-all group",
                                         active
                                             ? "bg-white/20 text-white font-medium backdrop-blur-sm"
                                             : "hover:bg-white/20 text-white/80 hover:text-white"
@@ -99,7 +100,8 @@ export function Sidebar() {
                 </ul>
             </nav>
 
-            <div className="flex-shrink-0 p-4 lg:p-6 border-t border-white/20">
+            {/* Logout */}
+            <div className="flex-shrink-0 p-4 border-t border-white/20">
                 <button
                     onClick={() => {
                         localStorage.removeItem('user');
@@ -107,7 +109,7 @@ export function Sidebar() {
                         localStorage.removeItem('token');
                         window.location.href = '/auth/login';
                     }}
-                    className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/20 transition-all w-full justify-center lg:justify-start text-white/80 hover:text-white group"
+                    className="flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl hover:bg-white/20 transition-all w-full text-white/80 hover:text-white group"
                 >
                     <LogOut className="w-5 h-5 transition-transform group-hover:scale-110" />
                     <span className="hidden lg:block">Logout</span>
