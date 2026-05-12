@@ -136,6 +136,14 @@ public class SecurityConfig {
 
                         // === ADMIN ===
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin/stats").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/admin/users/block").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/admin/users/*/role").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin/licenses/pending").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/admin/licenses/verify").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/admin/create-admin").hasRole("ADMIN")
 
                         // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()

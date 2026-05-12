@@ -128,6 +128,9 @@ public class UserService implements UserDetailsService {
         bloodCenter.setDirectorFullName(request.getBloodCenterDirectorFullName());
         bloodCenter.setLatitude(request.getLatitude());
         bloodCenter.setLongitude(request.getLongitude());
+        if (request.getBloodCenterLicenseFile() != null && !request.getBloodCenterLicenseFile().isEmpty()) {
+            bloodCenter.setLicenseFile(request.getBloodCenterLicenseFile());
+        }
         bloodCenterRepository.save(bloodCenter);
     }
 
@@ -142,7 +145,9 @@ public class UserService implements UserDetailsService {
         medCenter.setLicenseFile(request.getMedCenterLicenseFile());
         medCenter.setDirectorFullName(request.getMedCenterDirectorFullName());
         medCenter.setSpecialization(request.getMedCenterSpecialization());
-
+        if (request.getMedCenterLicenseFile() != null && !request.getMedCenterLicenseFile().isEmpty()) {
+            medCenter.setLicenseFile(request.getMedCenterLicenseFile());
+        }
         medCenterRepository.save(medCenter);
     }
 

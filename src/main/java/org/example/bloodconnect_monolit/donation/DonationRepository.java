@@ -15,4 +15,5 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
     List<Donation> findByBloodCenter_BloodCenterIdAndDonationDateBetween(
             Long bloodCenterId, LocalDateTime start, LocalDateTime end
     );
+    long countByDonationDateBetween(LocalDateTime start, LocalDateTime end);
 }

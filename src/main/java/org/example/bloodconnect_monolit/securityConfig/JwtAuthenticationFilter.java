@@ -47,23 +47,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String requestPath = request.getRequestURI();
+        System.out.println("Processing request: " + requestPath);
         if (requestPath.startsWith("/auth/")) {
+            System.out.println("Auth endpoint, skipping filter");
             filterChain.doFilter(request, response);
             return;
         }
 
         final String authHeader = request.getHeader("Authorization");
+        System.out.println("Authorization header: " + (authHeader != null ? "present" : "MISSING"));
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("No Bearer token");
             filterChain.doFilter(request, response);
             return;
         }
 
         final String jwt = authHeader.substring(7);
         final String userEmail = jwtTokenProvider.extractUsername(jwt);
+        System.out.println(" Extracted email: " + userEmail);
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            System.out.println("User roles: " + userDetails.getAuthorities());
 
             if (jwtTokenProvider.validateToken(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -73,6 +79,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                System.out.println(" Authentication set for: " + userEmail);
+            } else {
+                System.out.println(" Token validation failed for: " + userEmail);
             }
         }
         filterChain.doFilter(request, response);

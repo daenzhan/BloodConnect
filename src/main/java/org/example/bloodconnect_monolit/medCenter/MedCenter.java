@@ -38,11 +38,24 @@ public class MedCenter {
     @Column(name = "specialization")
     private String specialization;
 
+    @Column(name = "verification_status")
+    private String verificationStatus = "PENDING";
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    @Column(name = "verified_by")
+    private Long verifiedBy;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        verificationStatus = "PENDING";
     }
 }

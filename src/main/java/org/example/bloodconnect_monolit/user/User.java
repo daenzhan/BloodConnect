@@ -35,9 +35,21 @@ public class User implements UserDetails {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "is_active")
+    private boolean isActive = true;
+
+    @Column(name = "blocked_reason")
+    private String blockedReason;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        isActive = true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return isActive;
     }
 
     @Override
@@ -65,8 +77,5 @@ public class User implements UserDetails {
         return true;
     }
 
-    @Override
-    public boolean isEnabled() {
-        return true;
-    }
+
 }

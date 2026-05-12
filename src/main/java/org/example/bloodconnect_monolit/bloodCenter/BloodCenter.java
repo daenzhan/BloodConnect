@@ -51,10 +51,28 @@ public class BloodCenter {
     @Column(name = "longitude")
     private Double longitude;
 
+    @Column(name = "verification_status")
+    private String verificationStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    @Column(name = "verified_by")
+    private Long verifiedBy;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "bloodCenter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<BloodReserve> bloodReserves = new ArrayList<>();
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        verificationStatus = "PENDING";
+    }
 }
