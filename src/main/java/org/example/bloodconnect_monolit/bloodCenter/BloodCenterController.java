@@ -1,13 +1,12 @@
 package org.example.bloodconnect_monolit.bloodCenter;
 
-import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
-import org.example.bloodconnect_monolit.bloodReserve.BloodReserveRepository;
 import org.example.bloodconnect_monolit.donation.Donation;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.example.bloodconnect_monolit.bloodreserve.BloodReserve;
+import org.example.bloodconnect_monolit.bloodreserve.BloodReserveRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -26,18 +25,6 @@ public class BloodCenterController {
 
     @Autowired
     private DonationRepository donationRepository;
-
-    // Все возможные типы крови
-    private final List<Map<String, String>> ALL_BLOOD_TYPES = Arrays.asList(
-            Map.of("group", "A", "rh", "+"),
-            Map.of("group", "A", "rh", "-"),
-            Map.of("group", "B", "rh", "+"),
-            Map.of("group", "B", "rh", "-"),
-            Map.of("group", "AB", "rh", "+"),
-            Map.of("group", "AB", "rh", "-"),
-            Map.of("group", "O", "rh", "+"),
-            Map.of("group", "O", "rh", "-")
-    );
 
     @GetMapping
     public ResponseEntity<List<BloodCenter>> getAllBloodCenters() {
@@ -58,99 +45,130 @@ public class BloodCenterController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // Получение всех резервов крови для центра
     @GetMapping("/{bloodCenterId}/reserves")
-    public ResponseEntity<List<BloodReserve>> getReserves(@PathVariable Long bloodCenterId) {
-        List<BloodReserve> reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
+    public ResponseEntity<?> getReserves(@PathVariable Long bloodCenterId) {
+        try {
+            List<BloodReserve> reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
 
-        // Если резервов нет - создаем все типы с 0
-        if (reserves.isEmpty()) {
-            initializeReserves(bloodCenterId);
-            reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
-        }
+            List<Map<String, Object>> activeReserves = new ArrayList<>();
+            int totalUnits = 0;
+            int availableUnits = 0;
+            int quarantinedUnits = 0;
 
-        return ResponseEntity.ok(reserves);
-    }
+            Map<String, Integer> bloodGroupStats = new HashMap<>();
+            Map<String, Integer> componentStats = new HashMap<>();
 
-    @PutMapping("/{bloodCenterId}/reserves")
-    public ResponseEntity<?> updateReserve(@PathVariable Long bloodCenterId,
-                                           @RequestBody BloodReserve updatedReserve) {
-        Optional<BloodReserve> existingOpt = bloodReserveRepository
-                .findByBloodCenter_BloodCenterIdAndBloodGroupAndRhesusFactor(
-                        bloodCenterId,
-                        updatedReserve.getBloodGroup(),
-                        updatedReserve.getRhesusFactor()
+            for (BloodReserve reserve : reserves) {
+                Map<String, Object> reserveMap = new HashMap<>();
+                reserveMap.put("reserveId", reserve.getReserveId());
+                reserveMap.put("componentType", reserve.getComponentType());
+                reserveMap.put("bloodGroup", reserve.getBloodGroup());
+                reserveMap.put("rhesusFactor", reserve.getRhesusFactor());
+                reserveMap.put("inQuarantine", reserve.getInQuarantine());
+                reserveMap.put("quarantineEndDate", reserve.getQuarantineEndDate());
+                reserveMap.put("isAvailable", reserve.getIsAvailable());
+                reserveMap.put("expirationDate", reserve.getExpirationDate());
+                reserveMap.put("createdDate", reserve.getCreatedDate());
+                reserveMap.put("donationId", reserve.getDonationId());
+
+                if (reserve.getInQuarantine() && reserve.getQuarantineEndDate() != null) {
+                    long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(
+                            LocalDateTime.now(), reserve.getQuarantineEndDate()
+                    );
+                    reserveMap.put("quarantineDaysRemaining", Math.max(0, daysRemaining));
+                } else {
+                    reserveMap.put("quarantineDaysRemaining", 0);
+                }
+
+                long daysUntilExpiration = java.time.temporal.ChronoUnit.DAYS.between(
+                        LocalDateTime.now(), reserve.getExpirationDate()
                 );
+                reserveMap.put("daysUntilExpiration", Math.max(0, daysUntilExpiration));
+                reserveMap.put("isExpired", daysUntilExpiration <= 0);
 
-        if (existingOpt.isPresent()) {
-            BloodReserve existing = existingOpt.get();
-            existing.setQuantity(updatedReserve.getQuantity());
-            bloodReserveRepository.save(existing);
-        } else {
-            Optional<BloodCenter> centerOpt = bloodCenterRepository.findById(bloodCenterId);
-            if (centerOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body("Blood center not found");
+                activeReserves.add(reserveMap);
+                totalUnits++;
+
+                if (reserve.isReadyForDistribution()) {
+                    availableUnits++;
+                }
+                if (reserve.getInQuarantine()) {
+                    quarantinedUnits++;
+                }
+
+                String bloodKey = reserve.getBloodGroup() + (reserve.getRhesusFactor().equals("POSITIVE") ? "+" : "-");
+                bloodGroupStats.put(bloodKey, bloodGroupStats.getOrDefault(bloodKey, 0) + 1);
+
+                componentStats.put(reserve.getComponentType(), componentStats.getOrDefault(reserve.getComponentType(), 0) + 1);
             }
-            updatedReserve.setBloodCenter(centerOpt.get());
-            bloodReserveRepository.save(updatedReserve);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("reserves", activeReserves);
+            response.put("totalUnits", totalUnits);
+            response.put("availableUnits", availableUnits);
+            response.put("quarantinedUnits", quarantinedUnits);
+            response.put("expiredUnits", totalUnits - availableUnits - quarantinedUnits);
+            response.put("bloodGroupStats", bloodGroupStats);
+            response.put("componentStats", componentStats);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
-        return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{bloodCenterId}/reserves/add")
-    public ResponseEntity<?> addToReserve(@PathVariable Long bloodCenterId,
-                                          @RequestBody Map<String, Object> request) {
-        String bloodGroup = (String) request.get("bloodGroup");
-        String rhesusFactor = (String) request.get("rhesusFactor");
-        Integer quantity = (Integer) request.get("quantity");
+    // Получение инвентаря
+    @GetMapping("/{bloodCenterId}/inventory")
+    public ResponseEntity<?> getInventory(@PathVariable Long bloodCenterId) {
+        try {
+            List<BloodReserve> reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
 
-        // Сначала убеждаемся, что все типы крови существуют
-        initializeReserves(bloodCenterId);
+            List<Map<String, Object>> inventory = new ArrayList<>();
 
-        Optional<BloodReserve> existingOpt = bloodReserveRepository
-                .findByBloodCenter_BloodCenterIdAndBloodGroupAndRhesusFactor(
-                        bloodCenterId, bloodGroup, rhesusFactor);
+            for (BloodReserve reserve : reserves) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("reserveId", reserve.getReserveId());
+                item.put("componentType", reserve.getComponentType());
+                item.put("bloodGroup", reserve.getBloodGroup());
+                item.put("rhesusFactor", reserve.getRhesusFactor());
+                item.put("bloodType", reserve.getBloodGroup() + (reserve.getRhesusFactor().equals("POSITIVE") ? "+" : "-"));
+                item.put("inQuarantine", reserve.getInQuarantine());
+                item.put("isAvailable", reserve.getIsAvailable());
+                item.put("expirationDate", reserve.getExpirationDate());
+                item.put("quarantineEndDate", reserve.getQuarantineEndDate());
+                item.put("donationId", reserve.getDonationId());
 
-        if (existingOpt.isPresent()) {
-            BloodReserve existing = existingOpt.get();
-            existing.setQuantity(existing.getQuantity() + quantity);
-            bloodReserveRepository.save(existing);
-        } else {
-            // Если вдруг не существует - создаем
-            BloodCenter center = bloodCenterRepository.findById(bloodCenterId)
-                    .orElseThrow(() -> new RuntimeException("Blood center not found"));
-            BloodReserve newReserve = new BloodReserve();
-            newReserve.setBloodCenter(center);
-            newReserve.setBloodGroup(bloodGroup);
-            newReserve.setRhesusFactor(rhesusFactor);
-            newReserve.setQuantity(quantity);
-            bloodReserveRepository.save(newReserve);
-        }
-        return ResponseEntity.ok().build();
-    }
+                long daysUntilExpiration = java.time.temporal.ChronoUnit.DAYS.between(
+                        LocalDateTime.now(), reserve.getExpirationDate()
+                );
+                item.put("daysUntilExpiration", Math.max(0, daysUntilExpiration));
 
-    // Метод для инициализации всех типов крови с 0 единицами
-    private void initializeReserves(Long bloodCenterId) {
-        BloodCenter center = bloodCenterRepository.findById(bloodCenterId)
-                .orElseThrow(() -> new RuntimeException("Blood center not found"));
+                String componentDisplay = "";
+                switch (reserve.getComponentType()) {
+                    case "WHOLE_BLOOD": componentDisplay = "Whole Blood"; break;
+                    case "RED_BLOOD_CELLS": componentDisplay = "Red Blood Cells"; break;
+                    case "PLATELETS": componentDisplay = "Platelets"; break;
+                    case "PLASMA": componentDisplay = "Plasma"; break;
+                    case "CRYOPRECIPITATE": componentDisplay = "Cryoprecipitate"; break;
+                    default: componentDisplay = reserve.getComponentType();
+                }
+                item.put("componentDisplayName", componentDisplay);
 
-        for (Map<String, String> bloodType : ALL_BLOOD_TYPES) {
-            String group = bloodType.get("group");
-            String rh = bloodType.get("rh");
-
-            Optional<BloodReserve> existing = bloodReserveRepository
-                    .findByBloodCenter_BloodCenterIdAndBloodGroupAndRhesusFactor(bloodCenterId, group, rh);
-
-            if (existing.isEmpty()) {
-                BloodReserve newReserve = new BloodReserve();
-                newReserve.setBloodCenter(center);
-                newReserve.setBloodGroup(group);
-                newReserve.setRhesusFactor(rh);
-                newReserve.setQuantity(0);
-                bloodReserveRepository.save(newReserve);
+                inventory.add(item);
             }
+
+            return ResponseEntity.ok(inventory);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
+    // Получение статистики донаций
     @GetMapping("/{bloodCenterId}/statistics")
     public ResponseEntity<Map<String, Object>> getStatistics(@PathVariable Long bloodCenterId,
                                                              @RequestParam(defaultValue = "month") String period) {
@@ -169,12 +187,14 @@ public class BloodCenterController {
         List<Map<String, Object>> bloodTypeDistribution = new ArrayList<>();
 
         if (totalDonations > 0) {
-            Map<String, Long> bloodTypeCount = donations.stream()
-                    .filter(d -> d.getAnalysis() != null && d.getAnalysis().getBloodGroup() != null)
-                    .collect(Collectors.groupingBy(
-                            d -> d.getAnalysis().getBloodGroup() + d.getAnalysis().getRhesusFactor(),
-                            Collectors.counting()
-                    ));
+            Map<String, Long> bloodTypeCount = new HashMap<>();
+            for (Donation donation : donations) {
+                if (donation.getAnalysis() != null && donation.getAnalysis().getBloodGroup() != null) {
+                    String bloodType = donation.getAnalysis().getBloodGroup() +
+                            (donation.getAnalysis().getRhesusFactor().equals("POSITIVE") ? "+" : "-");
+                    bloodTypeCount.put(bloodType, bloodTypeCount.getOrDefault(bloodType, 0L) + 1);
+                }
+            }
 
             for (Map.Entry<String, Long> entry : bloodTypeCount.entrySet()) {
                 Map<String, Object> typeMap = new HashMap<>();
@@ -193,11 +213,14 @@ public class BloodCenterController {
             LocalDateTime start = now.minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
             LocalDateTime end = start.plusMonths(1);
 
-            long count = donations.stream()
-                    .filter(d -> d.getDonationDate() != null &&
-                            d.getDonationDate().isAfter(start) &&
-                            d.getDonationDate().isBefore(end))
-                    .count();
+            long count = 0;
+            for (Donation donation : donations) {
+                if (donation.getDonationDate() != null &&
+                        donation.getDonationDate().isAfter(start) &&
+                        donation.getDonationDate().isBefore(end)) {
+                    count++;
+                }
+            }
 
             Map<String, Object> monthMap = new HashMap<>();
             monthMap.put("month", start.format(formatter));
@@ -212,36 +235,5 @@ public class BloodCenterController {
         response.put("monthlyData", monthlyData);
 
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{bloodCenterId}/reserves/initialize")
-    public ResponseEntity<?> initializeReserves_(@PathVariable Long bloodCenterId) {
-        try {
-            BloodCenter center = bloodCenterRepository.findById(bloodCenterId)
-                    .orElseThrow(() -> new RuntimeException("Blood center not found"));
-
-            String[][] bloodTypes = {{"A", "+"}, {"A", "-"}, {"B", "+"}, {"B", "-"},
-                    {"AB", "+"}, {"AB", "-"}, {"O", "+"}, {"O", "-"}};
-
-            for (String[] type : bloodTypes) {
-                String group = type[0];
-                String rh = type[1];
-
-                Optional<BloodReserve> existing = bloodReserveRepository
-                        .findByBloodCenter_BloodCenterIdAndBloodGroupAndRhesusFactor(bloodCenterId, group, rh);
-
-                if (existing.isEmpty()) {
-                    BloodReserve reserve = new BloodReserve();
-                    reserve.setBloodCenter(center);
-                    reserve.setBloodGroup(group);
-                    reserve.setRhesusFactor(rh);
-                    reserve.setQuantity(0);
-                    bloodReserveRepository.save(reserve);
-                }
-            }
-            return ResponseEntity.ok().body(Map.of("message", "All blood types initialized"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
     }
 }

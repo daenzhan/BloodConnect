@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -209,6 +210,28 @@ public class AppointmentController {
             return ResponseEntity.ok(appointmentsWithDonation);
         } catch (Exception e) {
             e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{appointmentId}/update-status")
+    public ResponseEntity<?> updateAppointmentStatus(@PathVariable Long appointmentId, @RequestBody Map<String, String> request) {
+        try {
+            String newStatus = request.get("status");
+            Optional<Appointment> appointmentOpt = appointmentRepository.findById(appointmentId);
+            if (appointmentOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Appointment appointment = appointmentOpt.get();
+            appointment.setStatus(newStatus);
+            appointmentRepository.save(appointment);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Status updated successfully",
+                    "status", newStatus
+            ));
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

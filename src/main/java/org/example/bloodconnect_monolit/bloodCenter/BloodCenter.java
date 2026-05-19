@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
 import org.example.bloodconnect_monolit.user.User;
 
 import java.time.LocalDateTime;
@@ -68,7 +67,7 @@ public class BloodCenter {
 
     @OneToMany(mappedBy = "bloodCenter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
-    private List<BloodReserve> bloodReserves = new ArrayList<>();
+    private List<org.example.bloodconnect_monolit.bloodreserve.BloodReserve> bloodReserves = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

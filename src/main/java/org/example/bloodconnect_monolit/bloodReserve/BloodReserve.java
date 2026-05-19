@@ -1,35 +1,114 @@
-package org.example.bloodconnect_monolit.bloodReserve;
+package org.example.bloodconnect_monolit.bloodreserve;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
-import org.example.bloodconnect_monolit.donation.Donation;
+
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "bloodreserves")
+@Table(name = "blood_reserves")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class BloodReserve {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long bloodReserveId;
+    @Column(name = "reserve_id")
+    private Long reserveId;
 
-    //    @Column(nullable = false)
+    @Column(name = "component_type", nullable = false)
+    private String componentType;
+
+    @Column(name = "blood_group", nullable = false)
     private String bloodGroup;
 
-    //    @Column(nullable = false)
+    @Column(name = "rhesus_factor", nullable = false)
     private String rhesusFactor;
 
-    //    @Column(nullable = false)
+    @Column(name = "in_quarantine", nullable = false)
+    private Boolean inQuarantine = true;
+
+    @Column(name = "quarantine_end_date")
+    private LocalDateTime quarantineEndDate;
+
+    @Column(name = "is_available", nullable = false)
+    private Boolean isAvailable = false;
+
+    @Column(name = "expiration_date", nullable = false)
+    private LocalDateTime expirationDate;
+
+    @Column(name = "created_date", nullable = false)
+    private LocalDateTime createdDate;
+
+    @Column(name = "donation_id", nullable = false, unique = true)
+    private Long donationId;
+
+    @Column(name = "donor_id", nullable = false)
+    private Long donorId;
+
+    @Column(name = "analysis_id")
+    private Long analysisId;
+
+    @Column(name = "notes")
+    private String notes;
+
+    @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
     @ManyToOne
-    @JoinColumn(name = "bloodCenterId")
-    @JsonIgnore
+    @JoinColumn(name = "blood_center_id", nullable = false)
     private BloodCenter bloodCenter;
 
+    @PrePersist
+    protected void onCreate() {
+        createdDate = LocalDateTime.now();
+        calculateExpirationDate();
+
+        // Логика для карантина и доступности
+        if ("PLASMA".equals(componentType)) {
+            // Плазма требует карантин
+            if (inQuarantine && quarantineEndDate == null) {
+                quarantineEndDate = createdDate.plusDays(90); // 90 дней для плазмы
+            }
+            isAvailable = false; // Плазма не доступна до окончания карантина
+        } else {
+            // Остальные компоненты сразу готовы
+            inQuarantine = false;
+            isAvailable = true;
+            quarantineEndDate = null;
+        }
+    }
+
+    public void calculateExpirationDate() {
+        LocalDateTime now = LocalDateTime.now();
+        switch (componentType) {
+            case "WHOLE_BLOOD":
+                expirationDate = now.plusDays(35);
+                break;
+            case "RED_BLOOD_CELLS":
+                expirationDate = now.plusDays(42);
+                break;
+            case "PLATELETS":
+                expirationDate = now.plusDays(5);
+                break;
+            case "PLASMA":
+                expirationDate = now.plusYears(3);
+                break;
+            case "CRYOPRECIPITATE":
+                expirationDate = now.plusYears(2);
+                break;
+            default:
+                expirationDate = now.plusDays(30);
+        }
+    }
+
+    public boolean isReadyForDistribution() {
+        return isAvailable &&
+                !inQuarantine &&
+                expirationDate.isAfter(LocalDateTime.now());
+    }
 }

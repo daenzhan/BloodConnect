@@ -16,8 +16,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Calendar as CalendarIcon, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical } from "lucide-react";
+import { Search, Calendar, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical, Database, Plus, Trash2, Eye } from "lucide-react";
 
+// ============== ХЕЛПЕРЫ ==============
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -42,6 +43,80 @@ const checkAuthAndRedirect = (response: Response) => {
     return false;
 };
 
+const formatDate = (dateStr: string) => {
+    try {
+        return new Date(dateStr).toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    } catch {
+        return "Invalid date";
+    }
+};
+
+const formatBloodType = (bloodGroup?: string, rhesusFactor?: string): string => {
+    if (!bloodGroup) return "Unknown";
+    const rh = rhesusFactor?.toLowerCase().includes("positive") ? "+" : "-";
+    return `${bloodGroup}${rh}`;
+};
+
+// ============== КОНСТАНТЫ ==============
+const statusColors: Record<string, string> = {
+    SCHEDULED: "bg-secondary text-secondary-foreground",
+    IN_PROGRESS: "bg-accent text-accent-foreground",
+    COMPLETED: "bg-muted text-muted-foreground",
+    CANCELLED: "bg-destructive/10 text-destructive",
+    QUALIFIED: "bg-primary/10 text-primary",
+    REJECTED: "bg-destructive/10 text-destructive",
+};
+
+const statusLabels: Record<string, string> = {
+    SCHEDULED: "Scheduled",
+    IN_PROGRESS: "In Progress",
+    COMPLETED: "Pending Analysis",
+    CANCELLED: "Cancelled",
+    QUALIFIED: "Qualified",
+    REJECTED: "Rejected",
+};
+
+const componentLabels: Record<string, string> = {
+    WHOLE_BLOOD: "Whole Blood",
+    RED_BLOOD_CELLS: "Red Blood Cells",
+    PLATELETS: "Platelets",
+    PLASMA: "Plasma",
+    CRYOPRECIPITATE: "Cryoprecipitate",
+};
+
+const componentColors: Record<string, string> = {
+    WHOLE_BLOOD: "bg-primary/10 text-primary",
+    RED_BLOOD_CELLS: "bg-primary/10 text-primary",
+    PLATELETS: "bg-accent/10 text-accent-foreground",
+    PLASMA: "bg-secondary/10 text-secondary-foreground",
+    CRYOPRECIPITATE: "bg-muted text-muted-foreground",
+};
+
+// Стандартные объемы для каждого компонента (мл)
+const getDefaultQuantity = (componentType: string): number => {
+    switch (componentType) {
+        case "WHOLE_BLOOD": return 450;
+        case "RED_BLOOD_CELLS": return 250;
+        case "PLATELETS": return 200;
+        case "PLASMA": return 250;
+        case "CRYOPRECIPITATE": return 150;
+        default: return 250;
+    }
+};
+
+// Стандартные дни карантина (только для плазмы)
+const getQuarantineDays = (componentType: string): number | null => {
+    if (componentType === "PLASMA") return 90;
+    return null;
+};
+
+// ============== ИНТЕРФЕЙСЫ ==============
 interface Appointment {
     appointmentId: number;
     appointmentDate: string;
@@ -58,6 +133,24 @@ interface Appointment {
         donationId: number;
         status: string;
     };
+    bloodReserves?: BloodReserve[];
+}
+
+interface BloodReserve {
+    reserveId: number;
+    componentType: string;
+    bloodGroup: string;
+    rhesusFactor: string;
+    inQuarantine: boolean;
+    quarantineEndDate?: string;
+    isAvailable: boolean;
+    expirationDate: string;
+    createdDate: string;
+    donationId: number;
+    notes?: string;
+    isReady: boolean;
+    daysUntilExpiration: number;
+    quantity?: number;
 }
 
 interface Analysis {
@@ -73,38 +166,18 @@ interface Analysis {
     rhesusFactor?: string;
     hemoglobin?: number;
     technicianNotes?: string;
-    analysisDate?: string;
     donationId: number;
     bloodCenterId: number;
     isComplete: boolean;
     isDonorEligible: boolean;
 }
 
-const statusColors: Record<string, string> = {
-    SCHEDULED: "bg-blue-100 text-blue-800 border-blue-200",
-    COMPLETED: "bg-green-100 text-green-800 border-green-200",
-    CANCELLED: "bg-red-100 text-red-800 border-red-200",
-    IN_PROGRESS: "bg-purple-100 text-purple-800 border-purple-200",
-};
-
-const statusLabels: Record<string, string> = {
-    SCHEDULED: "Scheduled",
-    COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
-    IN_PROGRESS: "In Progress",
-};
-
-const formatBloodType = (bloodGroup?: string, rhesusFactor?: string): string => {
-    if (!bloodGroup) return "Unknown";
-    const rh = rhesusFactor?.toLowerCase().includes("positive") ? "+" :
-        rhesusFactor?.toLowerCase().includes("negative") ? "-" : "";
-    return `${bloodGroup}${rh}`;
-};
-
+// ============== ОСНОВНОЙ КОМПОНЕНТ ==============
 export default function AppointmentsPage() {
     const searchParams = useSearchParams();
     const userId = searchParams.get('userId');
 
+    // Состояния
     const [bloodCenterId, setBloodCenterId] = useState<number | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
@@ -114,10 +187,9 @@ export default function AppointmentsPage() {
     const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Analysis states
+    // Analysis состояния
     const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
     const [currentAnalysis, setCurrentAnalysis] = useState<Analysis | null>(null);
-    const [currentDonationId, setCurrentDonationId] = useState<number | null>(null);
     const [analysisFormData, setAnalysisFormData] = useState({
         hiv: "NEGATIVE",
         brucellosis: "NEGATIVE",
@@ -133,83 +205,76 @@ export default function AppointmentsPage() {
     const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false);
     const [isSavingAnalysis, setIsSavingAnalysis] = useState(false);
 
-    const [confirmDialog, setConfirmDialog] = useState<{
-        isOpen: boolean;
-        appointmentId: number | null;
-        donorName: string;
-    }>({
-        isOpen: false,
-        appointmentId: null,
-        donorName: "",
-    });
+    // Reserve состояния
+    const [reserveDialogOpen, setReserveDialogOpen] = useState(false);
+    const [reserveComponents, setReserveComponents] = useState<Array<{
+        id: string;
+        componentType: string;
+        quantity: number;
+        inQuarantine: boolean;
+        quarantineDays: number;
+        notes: string;
+    }>>([]);
+    const [isCreatingReserve, setIsCreatingReserve] = useState(false);
+    const [viewReservesDialogOpen, setViewReservesDialogOpen] = useState(false);
+    const [selectedReserves, setSelectedReserves] = useState<BloodReserve[]>([]);
+    const [deletingReserveId, setDeletingReserveId] = useState<number | null>(null);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [confirmAppointmentId, setConfirmAppointmentId] = useState<number | null>(null);
+    const [confirmDonorName, setConfirmDonorName] = useState("");
 
+    // ============== API ВЫЗОВЫ ==============
     const fetchBloodCenterId = useCallback(async () => {
         if (!userId) return;
-
         setError(null);
         try {
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            if (!headers) { window.location.href = '/auth/login'; return; }
 
-            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
-                signal: controller.signal,
-                headers: headers
-            });
-
-            clearTimeout(timeoutId);
+            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, { headers });
             if (checkAuthAndRedirect(response)) return;
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const data = await response.json();
-            if (!data.bloodCenterId || data.bloodCenterId <= 0) {
-                throw new Error("Invalid blood center ID");
-            }
-
+            if (!data.bloodCenterId || data.bloodCenterId <= 0) throw new Error("Invalid blood center ID");
             setBloodCenterId(data.bloodCenterId);
         } catch (error) {
-            console.error("Error fetching blood center:", error);
             setError(error instanceof Error ? error.message : "Failed to load blood center");
         }
     }, [userId]);
 
     const fetchAppointments = useCallback(async () => {
         if (!bloodCenterId) return;
-
         setIsLoading(true);
         setError(null);
 
         try {
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            if (!headers) { window.location.href = '/auth/login'; return; }
 
-            const response = await fetch(`http://localhost:8080/appointments/bloodcenter/${bloodCenterId}`, {
-                signal: controller.signal,
-                headers: headers
-            });
-
-            clearTimeout(timeoutId);
+            const response = await fetch(`http://localhost:8080/appointments/bloodcenter/${bloodCenterId}`, { headers });
             if (checkAuthAndRedirect(response)) return;
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const data = await response.json();
-            setAppointments(data);
-            setFilteredAppointments(data);
+            const appointmentsWithReserves = await Promise.all(
+                data.map(async (apt: Appointment) => {
+                    if (apt.donation?.donationId) {
+                        try {
+                            const reservesRes = await fetch(`http://localhost:8080/blood-reserves/donation/${apt.donation.donationId}`, { headers });
+                            if (reservesRes.ok) {
+                                return { ...apt, bloodReserves: await reservesRes.json() };
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching reserves:`, error);
+                        }
+                    }
+                    return { ...apt, bloodReserves: [] };
+                })
+            );
+            setAppointments(appointmentsWithReserves);
+            setFilteredAppointments(appointmentsWithReserves);
         } catch (error) {
-            console.error("Error fetching appointments:", error);
             setError(error instanceof Error ? error.message : "Failed to load appointments");
         } finally {
             setIsLoading(false);
@@ -220,21 +285,10 @@ export default function AppointmentsPage() {
         try {
             const headers = getAuthHeaders();
             if (!headers) return null;
-
-            const response = await fetch(`http://localhost:8080/analyses/donation/${donationId}`, {
-                headers: headers
-            });
-
-            if (response.status === 404) {
-                return null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data as Analysis;
+            const response = await fetch(`http://localhost:8080/analyses/donation/${donationId}`, { headers });
+            if (response.status === 404) return null;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json() as Analysis;
         } catch (error) {
             console.error("Error fetching analysis:", error);
             return null;
@@ -243,22 +297,14 @@ export default function AppointmentsPage() {
 
     const createAnalysis = async (donationId: number) => {
         if (!bloodCenterId) return null;
-
         try {
             const headers = getAuthHeaders();
             if (!headers) return null;
-
             const response = await fetch(`http://localhost:8080/analyses/create-for-donation/${donationId}?bloodCenterId=${bloodCenterId}`, {
-                method: "POST",
-                headers: headers
+                method: "POST", headers
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data as Analysis;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json() as Analysis;
         } catch (error) {
             console.error("Error creating analysis:", error);
             return null;
@@ -269,48 +315,91 @@ export default function AppointmentsPage() {
         try {
             const headers = getAuthHeaders();
             if (!headers) return null;
-
             const response = await fetch(`http://localhost:8080/analyses/${analysisId}`, {
-                method: "PUT",
-                headers: headers,
-                body: JSON.stringify(updates)
+                method: "PUT", headers, body: JSON.stringify(updates)
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
         } catch (error) {
             console.error("Error updating analysis:", error);
             throw error;
         }
     };
 
+    const createBloodReserve = async (analysisId: number, reserveData: any) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return null;
+            const response = await fetch(`http://localhost:8080/blood-reserves/create-from-analysis/${analysisId}`, {
+                method: "POST", headers, body: JSON.stringify(reserveData)
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to create reserve");
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Error creating blood reserve:", error);
+            throw error;
+        }
+    };
+
+    const deleteBloodReserve = async (reserveId: number) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return false;
+            const response = await fetch(`http://localhost:8080/blood-reserves/${reserveId}`, { method: "DELETE", headers });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return true;
+        } catch (error) {
+            console.error("Error deleting blood reserve:", error);
+            return false;
+        }
+    };
+
+    const fetchReservesByDonation = async (donationId: number) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return [];
+            const response = await fetch(`http://localhost:8080/blood-reserves/donation/${donationId}`, { headers });
+            if (!response.ok) return [];
+            return await response.json();
+        } catch (error) {
+            console.error("Error fetching reserves:", error);
+            return [];
+        }
+    };
+
+    const updateAppointmentStatus = async (appointmentId: number, newStatus: string) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return false;
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/update-status`, {
+                method: "PUT", headers, body: JSON.stringify({ status: newStatus })
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return true;
+        } catch (error) {
+            console.error("Error updating appointment status:", error);
+            return false;
+        }
+    };
+
+    // ============== ОБРАБОТЧИКИ СОБЫТИЙ ==============
     const handleAddAnalysis = async (appointment: Appointment) => {
         if (!appointment.donation?.donationId) {
-            alert("Donation record not found. Please start the appointment first.");
+            alert("Please complete the donation first");
             return;
         }
 
-        setCurrentDonationId(appointment.donation.donationId);
         setIsCreatingAnalysis(true);
-
         try {
-            // Check if analysis already exists
             let analysis = await fetchAnalysis(appointment.donation.donationId);
-
             if (!analysis) {
-                // Create new analysis
                 analysis = await createAnalysis(appointment.donation.donationId);
-                if (!analysis) {
-                    alert("Failed to create analysis record");
-                    return;
-                }
+                if (!analysis) throw new Error("Failed to create analysis");
             }
 
-            // Load analysis data into form
             setCurrentAnalysis(analysis);
             setAnalysisFormData({
                 hiv: analysis.hiv || "NEGATIVE",
@@ -324,10 +413,8 @@ export default function AppointmentsPage() {
                 hemoglobin: analysis.hemoglobin?.toString() || "",
                 technicianNotes: analysis.technicianNotes || ""
             });
-
             setAnalysisDialogOpen(true);
         } catch (error) {
-            console.error("Error in handleAddAnalysis:", error);
             alert("Failed to load analysis data");
         } finally {
             setIsCreatingAnalysis(false);
@@ -335,25 +422,18 @@ export default function AppointmentsPage() {
     };
 
     const handleSaveAnalysis = async () => {
-        if (!currentAnalysis || !currentAnalysis.analysisId) {
+        if (!currentAnalysis?.analysisId) {
             alert("No analysis record found");
             return;
         }
-
-        // Validate required fields
-        if (!analysisFormData.bloodGroup) {
-            alert("Please select blood group");
-            return;
-        }
-        if (!analysisFormData.rhesusFactor) {
-            alert("Please select rhesus factor");
+        if (!analysisFormData.bloodGroup || !analysisFormData.rhesusFactor) {
+            alert("Please select blood group and rhesus factor");
             return;
         }
 
         setIsSavingAnalysis(true);
-
         try {
-            const updates: any = {
+            const updates = {
                 hiv: analysisFormData.hiv,
                 brucellosis: analysisFormData.brucellosis,
                 hepatitisB: analysisFormData.hepatitisB,
@@ -361,111 +441,184 @@ export default function AppointmentsPage() {
                 syphilis: analysisFormData.syphilis,
                 bloodGroup: analysisFormData.bloodGroup,
                 rhesusFactor: analysisFormData.rhesusFactor,
-                technicianNotes: analysisFormData.technicianNotes || ""
+                technicianNotes: analysisFormData.technicianNotes || "",
+                altLevel: analysisFormData.altLevel ? parseFloat(analysisFormData.altLevel) : null,
+                hemoglobin: analysisFormData.hemoglobin ? parseFloat(analysisFormData.hemoglobin) : null
             };
 
-            if (analysisFormData.altLevel) {
-                updates.altLevel = parseFloat(analysisFormData.altLevel);
-            }
-            if (analysisFormData.hemoglobin) {
-                updates.hemoglobin = parseFloat(analysisFormData.hemoglobin);
-            }
+            const result = await updateAnalysis(currentAnalysis.analysisId, updates);
+            const appointmentToUpdate = appointments.find(apt => apt.donation?.donationId === currentAnalysis.donationId);
 
-            await updateAnalysis(currentAnalysis.analysisId, updates);
+            if (appointmentToUpdate && result.isComplete) {
+                await updateAppointmentStatus(appointmentToUpdate.appointmentId, result.isDonorEligible ? "QUALIFIED" : "REJECTED");
+            }
 
             alert("Analysis saved successfully!");
             setAnalysisDialogOpen(false);
-
-            // Refresh appointments to show updated status
             await fetchAppointments();
+
+            if (result.isComplete && result.isDonorEligible) {
+                alert("Donor is eligible. You can now create blood reserves.");
+            }
         } catch (error) {
-            console.error("Error saving analysis:", error);
             alert("Failed to save analysis");
         } finally {
             setIsSavingAnalysis(false);
         }
     };
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.log("No token found on appointments page");
-            window.location.href = '/auth/login';
+    const openCreateReserveDialog = async (appointment: Appointment) => {
+        if (!appointment.donation?.donationId) {
+            alert("Donation not found");
             return;
         }
-        fetchBloodCenterId();
-    }, [fetchBloodCenterId]);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.log("No token found on appointments page");
-            window.location.href = '/auth/login';
-            return;
-        }
-        if (bloodCenterId) {
-            fetchAppointments();
-        }
-    }, [bloodCenterId, fetchAppointments]);
-
-    useEffect(() => {
-        let result = [...appointments];
-
-        if (searchTerm.trim()) {
-            const searchLower = searchTerm.toLowerCase();
-            result = result.filter(apt =>
-                apt.donor?.firstName?.toLowerCase().includes(searchLower) ||
-                apt.donor?.lastName?.toLowerCase().includes(searchLower)
-            );
-        }
-
-        if (statusFilter !== "ALL") {
-            result = result.filter(apt => apt.status === statusFilter);
-        }
-
-        setFilteredAppointments(result);
-    }, [searchTerm, statusFilter, appointments]);
-
-    const formatDate = (dateStr: string) => {
         try {
-            return new Date(dateStr).toLocaleString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } catch {
-            return "Invalid date";
+            const analysis = await fetchAnalysis(appointment.donation.donationId);
+            if (!analysis || !analysis.isDonorEligible) {
+                alert("Donor is not eligible for blood reserve");
+                return;
+            }
+
+            setCurrentAnalysis(analysis);
+            setReserveComponents([{
+                id: Date.now().toString(),
+                componentType: "WHOLE_BLOOD",
+                quantity: getDefaultQuantity("WHOLE_BLOOD"),
+                inQuarantine: false,
+                quarantineDays: 0,
+                notes: ""
+            }]);
+            setReserveDialogOpen(true);
+        } catch (error) {
+            alert("Failed to load data");
+        }
+    };
+
+    const addReserveComponent = () => {
+        setReserveComponents([...reserveComponents, {
+            id: Date.now().toString(),
+            componentType: "WHOLE_BLOOD",
+            quantity: getDefaultQuantity("WHOLE_BLOOD"),
+            inQuarantine: false,
+            quarantineDays: 0,
+            notes: ""
+        }]);
+    };
+
+    const removeReserveComponent = (id: string) => {
+        setReserveComponents(reserveComponents.filter(c => c.id !== id));
+    };
+
+    const updateReserveComponent = (id: string, field: string, value: any) => {
+        setReserveComponents(reserveComponents.map(comp =>
+            comp.id === id ? { ...comp, [field]: value } : comp
+        ));
+    };
+
+    const handleComponentTypeChange = (id: string, value: string) => {
+        setReserveComponents(prevComponents =>
+            prevComponents.map(comp => {
+                if (comp.id === id) {
+                    let quantity = getDefaultQuantity(value);
+                    let inQuarantine = false;
+                    let quarantineDays = 0;
+
+                    if (value === "PLASMA") {
+                        inQuarantine = true;
+                        quarantineDays = 90;
+                    }
+
+                    return {
+                        ...comp,
+                        componentType: value,
+                        quantity: quantity,
+                        inQuarantine: inQuarantine,
+                        quarantineDays: quarantineDays
+                    };
+                }
+                return comp;
+            })
+        );
+    };
+
+    const handleSaveReserves = async () => {
+        if (!currentAnalysis?.analysisId) {
+            alert("No analysis found");
+            return;
+        }
+        if (reserveComponents.length === 0) {
+            alert("Please add at least one component");
+            return;
+        }
+
+        setIsCreatingReserve(true);
+        try {
+            let successCount = 0;
+            for (const component of reserveComponents) {
+                try {
+                    await createBloodReserve(currentAnalysis.analysisId, {
+                        componentType: component.componentType,
+                        quantity: component.quantity,
+                        inQuarantine: component.inQuarantine,
+                        quarantineDays: component.inQuarantine ? component.quarantineDays : 0,
+                        notes: component.notes
+                    });
+                    successCount++;
+                } catch (error) {
+                    console.error(`Failed to create ${component.componentType}:`, error);
+                }
+            }
+
+            alert(`Created ${successCount} of ${reserveComponents.length} components`);
+            setReserveDialogOpen(false);
+            await fetchAppointments();
+        } catch (error) {
+            alert("Failed to create some components");
+        } finally {
+            setIsCreatingReserve(false);
+        }
+    };
+
+    const handleViewReserves = async (appointment: Appointment) => {
+        if (!appointment.donation?.donationId) return;
+        try {
+            const reserves = await fetchReservesByDonation(appointment.donation.donationId);
+            setSelectedReserves(reserves);
+            setViewReservesDialogOpen(true);
+        } catch (error) {
+            alert("Failed to load reserves");
+        }
+    };
+
+    const handleDeleteReserve = async (reserveId: number) => {
+        if (!confirm("Delete this component?")) return;
+        setDeletingReserveId(reserveId);
+        try {
+            if (await deleteBloodReserve(reserveId)) {
+                setSelectedReserves(prev => prev.filter(r => r.reserveId !== reserveId));
+                await fetchAppointments();
+                alert("Component deleted");
+            }
+        } catch (error) {
+            alert("Failed to delete");
+        } finally {
+            setDeletingReserveId(null);
         }
     };
 
     const handleStartAppointment = async (appointmentId: number) => {
         setUpdatingStatus(appointmentId);
-        setError(null);
         try {
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/start`, {
-                method: "PUT",
-                headers: headers,
-            });
+            if (!headers) { window.location.href = '/auth/login'; return; }
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/start`, { method: "PUT", headers });
             if (checkAuthAndRedirect(response)) return;
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || "Failed to start appointment");
-            }
-
+            if (!response.ok) throw new Error("Failed to start");
             await fetchAppointments();
-            alert("Appointment started! Donation record created.");
-
+            alert("Donation started!");
         } catch (error) {
-            console.error("Error starting appointment:", error);
-            setError(error instanceof Error ? error.message : "Failed to start appointment");
-            alert(`Failed to start appointment: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert("Failed to start appointment");
         } finally {
             setUpdatingStatus(null);
         }
@@ -473,31 +626,16 @@ export default function AppointmentsPage() {
 
     const handleCancelAppointment = async (appointmentId: number) => {
         setUpdatingStatus(appointmentId);
-        setError(null);
-
         try {
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/cancel`, {
-                method: "PUT",
-                headers: headers,
-            });
+            if (!headers) { window.location.href = '/auth/login'; return; }
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/cancel`, { method: "PUT", headers });
             if (checkAuthAndRedirect(response)) return;
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || "Failed to cancel appointment");
-            }
-
+            if (!response.ok) throw new Error("Failed to cancel");
             await fetchAppointments();
-            alert("Appointment cancelled successfully");
-
+            alert("Appointment cancelled");
         } catch (error) {
-            console.error("Error cancelling appointment:", error);
-            setError(error instanceof Error ? error.message : "Failed to cancel appointment");
-            alert(`Failed to cancel appointment: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert("Failed to cancel");
         } finally {
             setUpdatingStatus(null);
         }
@@ -505,52 +643,56 @@ export default function AppointmentsPage() {
 
     const handleCompleteDonation = async (appointmentId: number) => {
         setUpdatingStatus(appointmentId);
-        setError(null);
-
         try {
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/complete-donation`, {
-                method: "PUT",
-                headers: headers,
-            });
+            if (!headers) { window.location.href = '/auth/login'; return; }
+            const response = await fetch(`http://localhost:8080/appointments/${appointmentId}/complete-donation`, { method: "PUT", headers });
             if (checkAuthAndRedirect(response)) return;
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || "Failed to complete donation");
-            }
-
+            if (!response.ok) throw new Error("Failed to complete");
             await fetchAppointments();
-            alert("Donation completed successfully!");
-
+            alert("Donation completed! Add analysis results.");
         } catch (error) {
-            console.error("Error completing donation:", error);
-            setError(error instanceof Error ? error.message : "Failed to complete donation");
-            alert(`Failed to complete donation: ${error instanceof Error ? error.message : "Please try again"}`);
+            alert("Failed to complete donation");
         } finally {
             setUpdatingStatus(null);
-            setConfirmDialog({ isOpen: false, appointmentId: null, donorName: "" });
+            setConfirmDialogOpen(false);
+            setConfirmAppointmentId(null);
+            setConfirmDonorName("");
         }
     };
 
-    const openConfirmDialog = (appointmentId: number, donorName: string) => {
-        setConfirmDialog({
-            isOpen: true,
-            appointmentId,
-            donorName,
-        });
-    };
+    // ============== useEffect ХУКИ ==============
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/auth/login';
+        else fetchBloodCenterId();
+    }, [fetchBloodCenterId]);
 
+    useEffect(() => {
+        if (bloodCenterId) fetchAppointments();
+    }, [bloodCenterId, fetchAppointments]);
+
+    useEffect(() => {
+        let result = [...appointments];
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            result = result.filter(apt =>
+                apt.donor?.firstName?.toLowerCase().includes(searchLower) ||
+                apt.donor?.lastName?.toLowerCase().includes(searchLower)
+            );
+        }
+        if (statusFilter !== "ALL") result = result.filter(apt => apt.status === statusFilter);
+        setFilteredAppointments(result);
+    }, [searchTerm, statusFilter, appointments]);
+
+    // ============== РЕНДЕР ==============
     if (!userId) {
         return (
-            <div className="flex min-h-screen bg-gray-50">
+            <div className="flex min-h-screen bg-background">
                 <BloodCenterSidebar userId={userId} />
                 <main className="flex-1 p-6">
                     <Card className="p-6 text-center">
-                        <p className="text-red-600">Access Denied: User ID not found</p>
+                        <p className="text-destructive">Access Denied: User ID not found</p>
                     </Card>
                 </main>
             </div>
@@ -560,111 +702,88 @@ export default function AppointmentsPage() {
     return (
         <>
             <BloodCenterSidebar userId={userId} />
-            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto bg-gray-50">
+            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen bg-background">
+                {/* Header */}
                 <header className="flex items-start justify-between mb-6">
                     <div>
                         <h1 className="text-3xl font-bold">Appointments</h1>
-                        <p className="text-sm text-gray-500 mt-1">Manage donor appointments and track donations</p>
+                        <p className="text-sm text-muted-foreground mt-1">Manage donor appointments and track donations</p>
                     </div>
                     <CenterProfileCard userId={userId} />
                 </header>
 
+                {/* Error Alert */}
                 {error && (
-                    <Card className="p-4 mb-5 bg-red-50 border-red-200">
-                        <p className="text-red-600 text-sm">{error}</p>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => {
-                                setError(null);
-                                fetchAppointments();
-                            }}
-                        >
-                            Retry
-                        </Button>
+                    <Card className="p-4 mb-5 bg-destructive/10 border-destructive/20">
+                        <p className="text-destructive text-sm">{error}</p>
+                        <Button variant="outline" size="sm" className="mt-2" onClick={() => { setError(null); fetchAppointments(); }}>Retry</Button>
                     </Card>
                 )}
 
+                {/* Filters */}
                 <Card className="p-3 mb-5">
                     <div className="flex flex-wrap gap-3">
                         <div className="flex-1 min-w-64">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <Input
-                                    placeholder="Search by donor name..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-9 h-9 text-sm"
-                                    disabled={isLoading}
-                                />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input placeholder="Search by donor name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9 text-sm" disabled={isLoading} />
                             </div>
                         </div>
                         <Select value={statusFilter} onValueChange={setStatusFilter} disabled={isLoading}>
-                            <SelectTrigger className="w-40 h-9 text-sm">
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
+                            <SelectTrigger className="w-48 h-9 text-sm"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-card">
                                 <SelectItem value="ALL">All Statuses</SelectItem>
                                 <SelectItem value="SCHEDULED">Scheduled</SelectItem>
                                 <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                                <SelectItem value="COMPLETED">Completed</SelectItem>
+                                <SelectItem value="COMPLETED">Pending Analysis</SelectItem>
+                                <SelectItem value="QUALIFIED">Qualified</SelectItem>
+                                <SelectItem value="REJECTED">Rejected</SelectItem>
                                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </Card>
 
+                {/* Appointments List */}
                 {filteredAppointments.length === 0 ? (
                     <Card className="p-12 text-center">
-                        <p className="text-gray-500">No appointments found</p>
+                        <p className="text-muted-foreground">No appointments found</p>
                         {(searchTerm || statusFilter !== "ALL") && (
-                            <Button
-                                variant="link"
-                                onClick={() => {
-                                    setSearchTerm("");
-                                    setStatusFilter("ALL");
-                                }}
-                                className="mt-2"
-                            >
-                                Clear filters
-                            </Button>
+                            <Button variant="link" onClick={() => { setSearchTerm(""); setStatusFilter("ALL"); }} className="mt-2">Clear filters</Button>
                         )}
                     </Card>
                 ) : (
                     <div className="space-y-3">
                         {filteredAppointments.map((apt) => (
                             <Card key={apt.appointmentId} className="p-4 hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between flex-wrap gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                                            <User className="w-5 h-5 text-red-600" />
+                                <div className="flex items-start justify-between flex-wrap gap-3">
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <User className="w-5 h-5 text-primary" />
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                                <h3 className="font-medium text-gray-900 text-sm">
-                                                    {apt.donor?.firstName || "Unknown"} {apt.donor?.lastName || ""}
-                                                </h3>
-                                                <Badge variant="outline" className={`text-xs ${statusColors[apt.status] || "bg-gray-100"}`}>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                <h3 className="font-medium">{apt.donor?.firstName || "Unknown"} {apt.donor?.lastName || ""}</h3>
+                                                <Badge variant="outline" className={`text-xs ${statusColors[apt.status] || "bg-muted"}`}>
                                                     {statusLabels[apt.status] || apt.status}
                                                 </Badge>
                                             </div>
-                                            <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                                                <span className="flex items-center gap-1">
-                                                    <CalendarIcon className="w-3 h-3" />
-                                                    {formatDate(apt.appointmentDate)}
-                                                </span>
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap mb-2">
+                                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(apt.appointmentDate)}</span>
                                                 {(apt.donor?.bloodGroup || apt.donor?.rhesusFactor) && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Droplet className="w-3 h-3 text-red-500" />
-                                                        {formatBloodType(apt.donor?.bloodGroup, apt.donor?.rhesusFactor)}
-                                                    </span>
+                                                    <span className="flex items-center gap-1"><Droplet className="w-3 h-3 text-primary" />{formatBloodType(apt.donor?.bloodGroup, apt.donor?.rhesusFactor)}</span>
                                                 )}
                                             </div>
-                                            {apt.notes && (
-                                                <p className="text-xs text-gray-400 mt-1 max-w-md truncate">
-                                                    Note: {apt.notes}
-                                                </p>
+                                            {apt.notes && <p className="text-xs text-muted-foreground mt-1 truncate max-w-md">Note: {apt.notes}</p>}
+                                            {apt.bloodReserves && apt.bloodReserves.length > 0 && (
+                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                    <span className="text-xs text-muted-foreground">Components:</span>
+                                                    {apt.bloodReserves.map(reserve => (
+                                                        <Badge key={reserve.reserveId} variant="outline" className={`text-xs ${componentColors[reserve.componentType] || "bg-muted"}`}>
+                                                            {componentLabels[reserve.componentType]}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -672,89 +791,59 @@ export default function AppointmentsPage() {
                                     <div className="flex gap-2">
                                         {apt.status === "SCHEDULED" && (
                                             <>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 text-xs"
-                                                    onClick={() => handleStartAppointment(apt.appointmentId)}
-                                                    disabled={updatingStatus === apt.appointmentId}
-                                                >
-                                                    {updatingStatus === apt.appointmentId ? (
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                    ) : (
-                                                        <Clock className="w-3 h-3 mr-1" />
-                                                    )}
-                                                    Start
+                                                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleStartAppointment(apt.appointmentId)} disabled={updatingStatus === apt.appointmentId}>
+                                                    {updatingStatus === apt.appointmentId ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Clock className="w-3 h-3 mr-1" />} Start
                                                 </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 text-xs text-red-600 hover:text-red-700"
-                                                    onClick={() => handleCancelAppointment(apt.appointmentId)}
-                                                    disabled={updatingStatus === apt.appointmentId}
-                                                >
-                                                    <XCircle className="w-3 h-3 mr-1" />
-                                                    Cancel
+                                                <Button size="sm" variant="outline" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => handleCancelAppointment(apt.appointmentId)} disabled={updatingStatus === apt.appointmentId}>
+                                                    <XCircle className="w-3 h-3 mr-1" /> Cancel
                                                 </Button>
                                             </>
                                         )}
 
                                         {apt.status === "IN_PROGRESS" && (
                                             <>
-                                                <Button
-                                                    size="sm"
-                                                    className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
-                                                    onClick={() => openConfirmDialog(apt.appointmentId, `${apt.donor?.firstName} ${apt.donor?.lastName}`)}
-                                                    disabled={updatingStatus === apt.appointmentId}
-                                                >
-                                                    {updatingStatus === apt.appointmentId ? (
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                    ) : (
-                                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                                    )}
-                                                    Complete Donation
+                                                <Button size="sm" className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => {
+                                                    setConfirmAppointmentId(apt.appointmentId);
+                                                    setConfirmDonorName(`${apt.donor?.firstName} ${apt.donor?.lastName}`);
+                                                    setConfirmDialogOpen(true);
+                                                }} disabled={updatingStatus === apt.appointmentId}>
+                                                    {updatingStatus === apt.appointmentId ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle className="w-3 h-3 mr-1" />} Complete
                                                 </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 text-xs text-red-600 hover:text-red-700"
-                                                    onClick={() => handleCancelAppointment(apt.appointmentId)}
-                                                    disabled={updatingStatus === apt.appointmentId}
-                                                >
-                                                    <XCircle className="w-3 h-3 mr-1" />
-                                                    Cancel
+                                                <Button size="sm" variant="outline" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => handleCancelAppointment(apt.appointmentId)} disabled={updatingStatus === apt.appointmentId}>
+                                                    <XCircle className="w-3 h-3 mr-1" /> Cancel
                                                 </Button>
                                             </>
                                         )}
 
                                         {apt.status === "COMPLETED" && (
-                                            <>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                                                    onClick={() => handleAddAnalysis(apt)}
-                                                    disabled={isCreatingAnalysis}
-                                                >
-                                                    {isCreatingAnalysis ? (
-                                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                    ) : (
-                                                        <FlaskConical className="w-3 h-3 mr-1" />
-                                                    )}
-                                                    Add Analysis
+                                            <div className="flex gap-2">
+                                                <Button size="sm" className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => handleAddAnalysis(apt)} disabled={isCreatingAnalysis}>
+                                                    {isCreatingAnalysis ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FlaskConical className="w-3 h-3 mr-1" />} Add Analysis
                                                 </Button>
-                                                <Badge variant="outline" className="bg-green-100 text-green-800">
-                                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                                    Donation Recorded
-                                                </Badge>
-                                            </>
+                                                <Badge variant="outline" className="bg-muted text-muted-foreground"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>
+                                            </div>
+                                        )}
+
+                                        {apt.status === "QUALIFIED" && (
+                                            <div className="flex gap-2">
+                                                <Button size="sm" className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => openCreateReserveDialog(apt)} disabled={isCreatingReserve}>
+                                                    <Plus className="w-3 h-3 mr-1" /> Add Components
+                                                </Button>
+                                                {apt.bloodReserves && apt.bloodReserves.length > 0 && (
+                                                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleViewReserves(apt)}>
+                                                        <Eye className="w-3 h-3 mr-1" /> View ({apt.bloodReserves.length})
+                                                    </Button>
+                                                )}
+                                                <Badge variant="outline" className="bg-primary/10 text-primary"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>
+                                            </div>
+                                        )}
+
+                                        {apt.status === "REJECTED" && (
+                                            <Badge variant="outline" className="bg-destructive/10 text-destructive"><XCircle className="w-3 h-3 mr-1" /> Not Eligible</Badge>
                                         )}
 
                                         {apt.status === "CANCELLED" && (
-                                            <Badge variant="outline" className="bg-red-100 text-red-800">
-                                                <XCircle className="w-3 h-3 mr-1" />
-                                                Cancelled
-                                            </Badge>
+                                            <Badge variant="outline" className="bg-destructive/10 text-destructive"><XCircle className="w-3 h-3 mr-1" /> Cancelled</Badge>
                                         )}
                                     </div>
                                 </div>
@@ -767,28 +856,16 @@ export default function AppointmentsPage() {
             {/* Analysis Dialog */}
             <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <FlaskConical className="w-5 h-5 text-blue-600" />
-                            Blood Analysis Results
-                        </DialogTitle>
-                    </DialogHeader>
-
+                    <DialogHeader><DialogTitle className="flex items-center gap-2"><FlaskConical className="w-5 h-5 text-primary" /> Blood Analysis Results</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-4">
-                        {/* Infectious Diseases */}
                         <div className="space-y-3">
-                            <h3 className="font-semibold text-sm text-gray-700">Infectious Disease Markers</h3>
+                            <h3 className="font-semibold text-sm">Infectious Disease Markers</h3>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs text-gray-600">HIV</label>
-                                    <Select
-                                        value={analysisFormData.hiv}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, hiv: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">HIV</label>
+                                    <Select value={analysisFormData.hiv} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hiv: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -796,15 +873,10 @@ export default function AppointmentsPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-600">Brucellosis</label>
-                                    <Select
-                                        value={analysisFormData.brucellosis}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, brucellosis: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Brucellosis</label>
+                                    <Select value={analysisFormData.brucellosis} onValueChange={(v) => setAnalysisFormData({...analysisFormData, brucellosis: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -812,15 +884,10 @@ export default function AppointmentsPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-600">Hepatitis B</label>
-                                    <Select
-                                        value={analysisFormData.hepatitisB}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisB: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Hepatitis B</label>
+                                    <Select value={analysisFormData.hepatitisB} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisB: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -828,15 +895,10 @@ export default function AppointmentsPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-600">Hepatitis C</label>
-                                    <Select
-                                        value={analysisFormData.hepatitisC}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisC: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Hepatitis C</label>
+                                    <Select value={analysisFormData.hepatitisC} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisC: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -844,15 +906,10 @@ export default function AppointmentsPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-600">Syphilis</label>
-                                    <Select
-                                        value={analysisFormData.syphilis}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, syphilis: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Syphilis</label>
+                                    <Select value={analysisFormData.syphilis} onValueChange={(v) => setAnalysisFormData({...analysisFormData, syphilis: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -861,21 +918,14 @@ export default function AppointmentsPage() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Blood Typing */}
                         <div className="space-y-3">
-                            <h3 className="font-semibold text-sm text-gray-700">Blood Typing</h3>
+                            <h3 className="font-semibold text-sm">Blood Typing</h3>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs text-gray-600">Blood Group *</label>
-                                    <Select
-                                        value={analysisFormData.bloodGroup}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, bloodGroup: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Blood Group *</label>
+                                    <Select value={analysisFormData.bloodGroup} onValueChange={(v) => setAnalysisFormData({...analysisFormData, bloodGroup: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select blood group" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="A">A</SelectItem>
                                             <SelectItem value="B">B</SelectItem>
                                             <SelectItem value="AB">AB</SelectItem>
@@ -884,15 +934,10 @@ export default function AppointmentsPage() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-600">Rhesus Factor *</label>
-                                    <Select
-                                        value={analysisFormData.rhesusFactor}
-                                        onValueChange={(v) => setAnalysisFormData({...analysisFormData, rhesusFactor: v})}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
+                                    <label className="text-xs text-muted-foreground">Rhesus Factor *</label>
+                                    <Select value={analysisFormData.rhesusFactor} onValueChange={(v) => setAnalysisFormData({...analysisFormData, rhesusFactor: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Select rhesus factor" /></SelectTrigger>
+                                        <SelectContent className="bg-white dark:bg-card">
                                             <SelectItem value="POSITIVE">Positive (+)</SelectItem>
                                             <SelectItem value="NEGATIVE">Negative (-)</SelectItem>
                                         </SelectContent>
@@ -900,116 +945,237 @@ export default function AppointmentsPage() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Biochemistry */}
                         <div className="space-y-3">
-                            <h3 className="font-semibold text-sm text-gray-700">Biochemistry</h3>
+                            <h3 className="font-semibold text-sm">Biochemistry</h3>
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs text-gray-600">ALT Level (U/L)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        value={analysisFormData.altLevel}
-                                        onChange={(e) => setAnalysisFormData({...analysisFormData, altLevel: e.target.value})}
-                                        placeholder="Normal: < 40"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-600">Hemoglobin (g/L)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        value={analysisFormData.hemoglobin}
-                                        onChange={(e) => setAnalysisFormData({...analysisFormData, hemoglobin: e.target.value})}
-                                        placeholder="Women: >125, Men: >135"
-                                    />
-                                </div>
+                                <div><label className="text-xs text-muted-foreground">ALT Level (U/L)</label><Input type="number" step="0.1" value={analysisFormData.altLevel} onChange={(e) => setAnalysisFormData({...analysisFormData, altLevel: e.target.value})} placeholder="Normal: < 40" /></div>
+                                <div><label className="text-xs text-muted-foreground">Hemoglobin (g/L)</label><Input type="number" step="0.1" value={analysisFormData.hemoglobin} onChange={(e) => setAnalysisFormData({...analysisFormData, hemoglobin: e.target.value})} placeholder="Women: >125, Men: >135" /></div>
                             </div>
                         </div>
-
-                        {/* Technician Notes */}
                         <div className="space-y-2">
-                            <label className="text-xs text-gray-600">Technician Notes</label>
-                            <textarea
-                                className="w-full border rounded-md p-2 text-sm"
-                                rows={3}
-                                value={analysisFormData.technicianNotes}
-                                onChange={(e) => setAnalysisFormData({...analysisFormData, technicianNotes: e.target.value})}
-                                placeholder="Additional observations or notes..."
-                            />
+                            <label className="text-xs text-muted-foreground">Technician Notes</label>
+                            <textarea className="w-full border rounded-md p-2 text-sm" rows={3} value={analysisFormData.technicianNotes} onChange={(e) => setAnalysisFormData({...analysisFormData, technicianNotes: e.target.value})} placeholder="Additional notes..." />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAnalysisDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveAnalysis} disabled={isSavingAnalysis} className="bg-primary hover:bg-primary/90">{isSavingAnalysis ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Analysis"}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reserve Dialog */}
+            <Dialog open={reserveDialogOpen} onOpenChange={setReserveDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Database className="w-5 h-5 text-primary" />
+                            Create Blood Components
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        {/* Donor Info */}
+                        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                            <p className="text-sm text-primary">
+                                <strong>Donor Blood Type:</strong> {currentAnalysis?.bloodGroup}{currentAnalysis?.rhesusFactor === "POSITIVE" ? "+" : "-"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Created date and expiration date will be calculated automatically
+                            </p>
+                        </div>
+
+                        {/* Components List */}
+                        <div className="space-y-4">
+                            {reserveComponents.map((component, index) => (
+                                <Card key={component.id} className="p-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-semibold">Component #{index + 1}</h3>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => removeReserveComponent(component.id)}
+                                            className="text-destructive h-8 w-8 p-0"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* Component Type */}
+                                        <div>
+                                            <label className="text-sm font-medium mb-1 block">Component Type *</label>
+                                            <Select
+                                                value={component.componentType}
+                                                onValueChange={(value) => handleComponentTypeChange(component.id, value)}
+                                            >
+                                                <SelectTrigger className="bg-white dark:bg-card">
+                                                    <SelectValue placeholder="Select component type" />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-white dark:bg-card">
+                                                    <SelectItem value="WHOLE_BLOOD">Whole Blood</SelectItem>
+                                                    <SelectItem value="RED_BLOOD_CELLS">Red Blood Cells</SelectItem>
+                                                    <SelectItem value="PLATELETS">Platelets</SelectItem>
+                                                    <SelectItem value="PLASMA">Plasma</SelectItem>
+                                                    <SelectItem value="CRYOPRECIPITATE">Cryoprecipitate</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {/* Quantity (ml) */}
+                                        <div>
+                                            <label className="text-sm font-medium mb-1 block">Quantity (ml) *</label>
+                                            <Input
+                                                type="number"
+                                                value={component.quantity}
+                                                onChange={(e) => updateReserveComponent(component.id, "quantity", parseInt(e.target.value) || 0)}
+                                                min="1"
+                                                placeholder="Enter quantity in ml"
+                                                className="bg-white dark:bg-card"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Quarantine - только для плазмы */}
+                                    {component.componentType === "PLASMA" && (
+                                        <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`quarantine-${component.id}`}
+                                                    checked={component.inQuarantine}
+                                                    onChange={(e) => updateReserveComponent(component.id, "inQuarantine", e.target.checked)}
+                                                    className="w-4 h-4 rounded border-gray-300"
+                                                />
+                                                <label htmlFor={`quarantine-${component.id}`} className="text-sm font-medium">
+                                                    Place in quarantine (90 days required for plasma)
+                                                </label>
+                                            </div>
+                                            {component.inQuarantine && (
+                                                <p className="text-xs text-muted-foreground mt-2 ml-6">
+                                                    Plasma requires 90 days quarantine period. Component will be available after {new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Info for other components */}
+                                    {component.componentType !== "PLASMA" && (
+                                        <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                                <span className="text-sm text-green-700 dark:text-green-400">
+                                                    This component is ready for immediate use
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notes */}
+                                    <div className="mt-4">
+                                        <label className="text-sm font-medium mb-1 block">Notes</label>
+                                        <textarea
+                                            className="w-full border rounded-md p-2 text-sm"
+                                            rows={2}
+                                            value={component.notes}
+                                            onChange={(e) => updateReserveComponent(component.id, "notes", e.target.value)}
+                                            placeholder={`Additional notes for ${componentLabels[component.componentType]}...`}
+                                        />
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {/* Add Component Button */}
+                        <Button
+                            variant="outline"
+                            onClick={addReserveComponent}
+                            className="w-full border-dashed"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Component
+                        </Button>
+
+                        {/* Storage Information */}
+                        <div className="bg-muted/30 rounded-lg p-3">
+                            <p className="text-xs text-muted-foreground">
+                                <strong>Storage & Expiration:</strong><br/>
+                                • Whole Blood: 35 days at 2-6°C<br/>
+                                • Red Blood Cells: 42 days at 2-6°C<br/>
+                                • Platelets: 5 days at 20-24°C with agitation<br/>
+                                • Plasma: 3 years at -18°C (after 90-day quarantine)<br/>
+                                • Cryoprecipitate: 2 years at -18°C
+                            </p>
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setAnalysisDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => setReserveDialogOpen(false)}>
                             Cancel
                         </Button>
                         <Button
-                            onClick={handleSaveAnalysis}
-                            disabled={isSavingAnalysis}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={handleSaveReserves}
+                            disabled={isCreatingReserve || reserveComponents.length === 0}
+                            className="bg-primary hover:bg-primary/90"
                         >
-                            {isSavingAnalysis ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Saving...
-                                </>
+                            {isCreatingReserve ? (
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
                             ) : (
-                                "Save Analysis"
+                                <>Create {reserveComponents.length} Component{reserveComponents.length !== 1 ? 's' : ''}</>
                             )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Confirm Complete Donation Dialog */}
-            <Dialog
-                open={confirmDialog.isOpen}
-                onOpenChange={(open) => !open && setConfirmDialog({ isOpen: false, appointmentId: null, donorName: "" })}
-            >
+            {/* View Reserves Dialog */}
+            <Dialog open={viewReservesDialogOpen} onOpenChange={setViewReservesDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle className="flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Blood Components</DialogTitle></DialogHeader>
+                    <div className="space-y-3 py-4">
+                        {selectedReserves.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground"><Database className="w-12 h-12 mx-auto mb-2 opacity-30" /><p>No components created yet</p></div>
+                        ) : (
+                            selectedReserves.map((reserve) => (
+                                <Card key={reserve.reserveId} className="p-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-semibold text-lg">{componentLabels[reserve.componentType]}</h3>
+                                            <p className="text-sm text-muted-foreground">Blood Type: {reserve.bloodGroup}{reserve.rhesusFactor === "POSITIVE" ? "+" : "-"}</p>
+                                            {reserve.quantity && <p className="text-xs text-muted-foreground">Quantity: {reserve.quantity} ml</p>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Badge className={reserve.isReady ? "bg-primary/10 text-primary" : reserve.inQuarantine ? "bg-accent/10 text-accent-foreground" : "bg-muted"}>
+                                                {reserve.isReady ? "Available" : reserve.inQuarantine ? "Quarantine" : "Processing"}
+                                            </Badge>
+                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteReserve(reserve.reserveId)} disabled={deletingReserveId === reserve.reserveId} className="text-destructive h-8 w-8 p-0">
+                                                {deletingReserveId === reserve.reserveId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                                        <div><p className="text-muted-foreground">Created:</p><p>{new Date(reserve.createdDate).toLocaleDateString()}</p></div>
+                                        <div><p className="text-muted-foreground">Expires:</p><p className={reserve.daysUntilExpiration <= 7 ? "text-destructive font-semibold" : ""}>{new Date(reserve.expirationDate).toLocaleDateString()}{reserve.daysUntilExpiration <= 7 && ` (${reserve.daysUntilExpiration} days left)`}</p></div>
+                                        {reserve.inQuarantine && reserve.quarantineEndDate && (<div><p className="text-muted-foreground">Quarantine until:</p><p>{new Date(reserve.quarantineEndDate).toLocaleDateString()}</p></div>)}
+                                        {reserve.notes && (<div className="col-span-2"><p className="text-muted-foreground">Notes:</p><p className="text-sm">{reserve.notes}</p></div>)}
+                                    </div>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+                    <DialogFooter><Button variant="outline" onClick={() => setViewReservesDialogOpen(false)}>Close</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Confirm Dialog */}
+            <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                            Confirm Donation Completion
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="pt-4">
-                        <p className="text-sm text-gray-600">
-                            Are you sure you want to complete the donation for <strong>{confirmDialog.donorName}</strong>?
-                        </p>
-                    </div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 my-2">
-                        <p className="text-sm text-yellow-800">
-                            This action will mark the donation as completed. You'll be able to add analysis results afterward.
-                        </p>
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button
-                            variant="outline"
-                            onClick={() => setConfirmDialog({ isOpen: false, appointmentId: null, donorName: "" })}
-                            disabled={updatingStatus === confirmDialog.appointmentId}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={() => confirmDialog.appointmentId && handleCompleteDonation(confirmDialog.appointmentId)}
-                            disabled={updatingStatus === confirmDialog.appointmentId}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            {updatingStatus === confirmDialog.appointmentId ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Processing...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Yes, Complete Donation
-                                </>
-                            )}
-                        </Button>
+                    <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-destructive" /> Confirm Donation</DialogTitle></DialogHeader>
+                    <p className="text-sm">Complete donation for <strong>{confirmDonorName}</strong>?</p>
+                    <div className="bg-muted/30 rounded-lg p-3"><p className="text-sm">You'll be able to add analysis results afterward.</p></div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={() => confirmAppointmentId && handleCompleteDonation(confirmAppointmentId)} className="bg-primary hover:bg-primary/90"><CheckCircle className="w-4 h-4 mr-2" /> Complete</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

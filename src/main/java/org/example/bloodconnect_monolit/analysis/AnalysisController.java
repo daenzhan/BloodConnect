@@ -120,7 +120,6 @@ public class AnalysisController {
         }
     }
 
-    // Обновление анализа (частичное или полное)
     @PutMapping("/{analysisId}")
     public ResponseEntity<?> updateAnalysis(@PathVariable Long analysisId, @RequestBody Map<String, Object> updates) {
         try {
@@ -131,7 +130,7 @@ public class AnalysisController {
 
             Analysis analysis = analysisOpt.get();
 
-            // Обновляем только те поля, которые переданы
+            // Обновляем поля
             if (updates.containsKey("hiv")) analysis.setHiv((String) updates.get("hiv"));
             if (updates.containsKey("brucellosis")) analysis.setBrucellosis((String) updates.get("brucellosis"));
             if (updates.containsKey("hepatitisB")) analysis.setHepatitisB((String) updates.get("hepatitisB"));
@@ -144,14 +143,14 @@ public class AnalysisController {
             if (updates.containsKey("technicianNotes")) analysis.setTechnicianNotes((String) updates.get("technicianNotes"));
 
             // Обновляем статус в зависимости от полноты заполнения
+            String donationStatus = null;
             if (analysis.isComplete()) {
                 analysis.setStatus("COMPLETED");
-                // Здесь можно добавить логику обновления статуса донации в зависимости от eligibility
                 if (analysis.isDonorEligible()) {
-                    // Донация APPROVED
-                    analysis.getDonation().setStatus("APPROVED");
+                    donationStatus = "QUALIFIED";
+                    analysis.getDonation().setStatus("QUALIFIED");
                 } else {
-                    // Донация REJECTED
+                    donationStatus = "REJECTED";
                     analysis.getDonation().setStatus("REJECTED");
                 }
                 donationRepository.save(analysis.getDonation());
@@ -161,11 +160,13 @@ public class AnalysisController {
 
             Analysis savedAnalysis = analysisRepository.save(analysis);
 
+            // Возвращаем полную информацию
             Map<String, Object> response = new HashMap<>();
             response.put("analysisId", savedAnalysis.getAnalysisId());
             response.put("status", savedAnalysis.getStatus());
             response.put("isComplete", savedAnalysis.isComplete());
             response.put("isDonorEligible", savedAnalysis.isComplete() ? savedAnalysis.isDonorEligible() : false);
+            response.put("donationStatus", donationStatus); // Добавляем статус донации
 
             return ResponseEntity.ok(response);
 
