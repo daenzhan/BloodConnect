@@ -28,296 +28,160 @@ public class AnalysisController {
     @Autowired
     private BloodCenterRepository bloodCenterRepository;
 
-    // Создать анализ для донации (автоматически при старте донации)
+    // Создание анализа по donationId
     @PostMapping("/create-for-donation/{donationId}")
-    public ResponseEntity<?> createAnalysisForDonation(@PathVariable Long donationId,
-                                                       @RequestParam Long bloodCenterId) {
+    public ResponseEntity<?> createAnalysisForDonation(
+            @PathVariable Long donationId,
+            @RequestParam Long bloodCenterId) {
+
         try {
+            // Проверяем существует ли донация
             Optional<Donation> donationOpt = donationRepository.findById(donationId);
             if (donationOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Donation not found"));
             }
 
+            Donation donation = donationOpt.get();
+
+            // Проверяем, не существует ли уже анализ для этой донации
+            Optional<Analysis> existingAnalysis = analysisRepository.findByDonation_DonationId(donationId);
+            if (existingAnalysis.isPresent()) {
+                return ResponseEntity.ok(existingAnalysis.get());
+            }
+
+            // Проверяем существование blood center
             Optional<BloodCenter> bloodCenterOpt = bloodCenterRepository.findById(bloodCenterId);
             if (bloodCenterOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Blood center not found"));
             }
 
-            // Проверяем, не существует ли уже анализ
-            Optional<Analysis> existingAnalysis = analysisRepository.findByDonation_DonationId(donationId);
-            if (existingAnalysis.isPresent()) {
-                return ResponseEntity.ok(Map.of(
-                        "message", "Analysis already exists",
-                        "analysisId", existingAnalysis.get().getAnalysisId(),
-                        "status", existingAnalysis.get().getStatus()
-                ));
-            }
-
+            // Создаем новый анализ
             Analysis analysis = new Analysis();
-            analysis.setDonation(donationOpt.get());
+            analysis.setDonation(donation);
             analysis.setBloodCenter(bloodCenterOpt.get());
             analysis.setStatus("PENDING");
             analysis.setAnalysisDate(LocalDateTime.now());
 
+            // Инициализируем все поля как null (будут заполнены позже)
+            analysis.setHiv(null);
+            analysis.setBrucellosis(null);
+            analysis.setHepatitisB(null);
+            analysis.setHepatitisC(null);
+            analysis.setSyphilis(null);
+            analysis.setAltLevel(null);
+            analysis.setBloodGroup(null);
+            analysis.setRhesusFactor(null);
+            analysis.setHemoglobin(null);
+            analysis.setTechnicianNotes(null);
+
             Analysis savedAnalysis = analysisRepository.save(analysis);
 
-            return ResponseEntity.ok(Map.of(
-                    "message", "Analysis created successfully",
-                    "analysisId", savedAnalysis.getAnalysisId(),
-                    "status", savedAnalysis.getStatus()
-            ));
+            return ResponseEntity.ok(savedAnalysis);
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to create analysis: " + e.getMessage()));
         }
     }
 
-    // Получить анализ по ID
-    @GetMapping("/{analysisId}")
-    public ResponseEntity<?> getAnalysisById(@PathVariable Long analysisId) {
+    // Получение анализа по donationId
+    @GetMapping("/donation/{donationId}")
+    public ResponseEntity<?> getAnalysisByDonationId(@PathVariable Long donationId) {
         try {
-            Optional<Analysis> analysis = analysisRepository.findById(analysisId);
-            if (analysis.isEmpty()) {
+            Optional<Analysis> analysisOpt = analysisRepository.findByDonation_DonationId(donationId);
+
+            if (analysisOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("exists", false, "message", "Analysis not found"));
+            }
+
+            Analysis analysis = analysisOpt.get();
+            Map<String, Object> response = new HashMap<>();
+            response.put("analysisId", analysis.getAnalysisId());
+            response.put("status", analysis.getStatus());
+            response.put("hiv", analysis.getHiv());
+            response.put("brucellosis", analysis.getBrucellosis());
+            response.put("hepatitisB", analysis.getHepatitisB());
+            response.put("hepatitisC", analysis.getHepatitisC());
+            response.put("syphilis", analysis.getSyphilis());
+            response.put("altLevel", analysis.getAltLevel());
+            response.put("bloodGroup", analysis.getBloodGroup());
+            response.put("rhesusFactor", analysis.getRhesusFactor());
+            response.put("hemoglobin", analysis.getHemoglobin());
+            response.put("technicianNotes", analysis.getTechnicianNotes());
+            response.put("analysisDate", analysis.getAnalysisDate());
+            response.put("donationId", analysis.getDonation().getDonationId());
+            response.put("bloodCenterId", analysis.getBloodCenter().getBloodCenterId());
+            response.put("isComplete", analysis.isComplete());
+            response.put("isDonorEligible", analysis.isComplete() ? analysis.isDonorEligible() : false);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to fetch analysis: " + e.getMessage()));
+        }
+    }
+
+    // Обновление анализа (частичное или полное)
+    @PutMapping("/{analysisId}")
+    public ResponseEntity<?> updateAnalysis(@PathVariable Long analysisId, @RequestBody Map<String, Object> updates) {
+        try {
+            Optional<Analysis> analysisOpt = analysisRepository.findById(analysisId);
+            if (analysisOpt.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
-            return ResponseEntity.ok(analysis.get());
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
 
-    // Получить анализ по donationId
-    @GetMapping("/donation/{donationId}")
-    public ResponseEntity<?> getAnalysisByDonation(@PathVariable Long donationId) {
-        try {
-            Optional<Analysis> analysis = analysisRepository.findByDonation_DonationId(donationId);
-            if (analysis.isEmpty()) {
-                return ResponseEntity.ok(Map.of(
-                        "exists", false,
-                        "message", "No analysis found for this donation"
-                ));
+            Analysis analysis = analysisOpt.get();
+
+            // Обновляем только те поля, которые переданы
+            if (updates.containsKey("hiv")) analysis.setHiv((String) updates.get("hiv"));
+            if (updates.containsKey("brucellosis")) analysis.setBrucellosis((String) updates.get("brucellosis"));
+            if (updates.containsKey("hepatitisB")) analysis.setHepatitisB((String) updates.get("hepatitisB"));
+            if (updates.containsKey("hepatitisC")) analysis.setHepatitisC((String) updates.get("hepatitisC"));
+            if (updates.containsKey("syphilis")) analysis.setSyphilis((String) updates.get("syphilis"));
+            if (updates.containsKey("altLevel")) analysis.setAltLevel(updates.get("altLevel") != null ? ((Number) updates.get("altLevel")).doubleValue() : null);
+            if (updates.containsKey("bloodGroup")) analysis.setBloodGroup((String) updates.get("bloodGroup"));
+            if (updates.containsKey("rhesusFactor")) analysis.setRhesusFactor((String) updates.get("rhesusFactor"));
+            if (updates.containsKey("hemoglobin")) analysis.setHemoglobin(updates.get("hemoglobin") != null ? ((Number) updates.get("hemoglobin")).doubleValue() : null);
+            if (updates.containsKey("technicianNotes")) analysis.setTechnicianNotes((String) updates.get("technicianNotes"));
+
+            // Обновляем статус в зависимости от полноты заполнения
+            if (analysis.isComplete()) {
+                analysis.setStatus("COMPLETED");
+                // Здесь можно добавить логику обновления статуса донации в зависимости от eligibility
+                if (analysis.isDonorEligible()) {
+                    // Донация APPROVED
+                    analysis.getDonation().setStatus("APPROVED");
+                } else {
+                    // Донация REJECTED
+                    analysis.getDonation().setStatus("REJECTED");
+                }
+                donationRepository.save(analysis.getDonation());
+            } else {
+                analysis.setStatus("IN_PROGRESS");
             }
-            return ResponseEntity.ok(analysis.get());
+
+            Analysis savedAnalysis = analysisRepository.save(analysis);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("analysisId", savedAnalysis.getAnalysisId());
+            response.put("status", savedAnalysis.getStatus());
+            response.put("isComplete", savedAnalysis.isComplete());
+            response.put("isDonorEligible", savedAnalysis.isComplete() ? savedAnalysis.isDonorEligible() : false);
+
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update analysis: " + e.getMessage()));
         }
     }
 
-    // Получить все анализы для blood center
+    // Получение всех анализов для blood center
     @GetMapping("/bloodcenter/{bloodCenterId}")
     public ResponseEntity<?> getAnalysesByBloodCenter(@PathVariable Long bloodCenterId) {
         try {
             List<Analysis> analyses = analysisRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
             return ResponseEntity.ok(analyses);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to fetch analyses: " + e.getMessage()));
         }
-    }
-
-    // Получить анализы по статусу для blood center
-    @GetMapping("/bloodcenter/{bloodCenterId}/status/{status}")
-    public ResponseEntity<?> getAnalysesByBloodCenterAndStatus(@PathVariable Long bloodCenterId,
-                                                               @PathVariable String status) {
-        try {
-            List<Analysis> analyses = analysisRepository.findByBloodCenterAndStatus(bloodCenterId, status);
-            return ResponseEntity.ok(analyses);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // Полностью обновить анализ
-    @PutMapping("/{analysisId}")
-    public ResponseEntity<?> updateAnalysis(@PathVariable Long analysisId,
-                                            @RequestBody Map<String, Object> analysisData) {
-        try {
-            Optional<Analysis> analysisOpt = analysisRepository.findById(analysisId);
-            if (analysisOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Analysis not found"));
-            }
-
-            Analysis analysis = analysisOpt.get();
-
-            // Обновляем поля, если они переданы
-            if (analysisData.containsKey("hiv")) analysis.setHiv((String) analysisData.get("hiv"));
-            if (analysisData.containsKey("brucellosis")) analysis.setBrucellosis((String) analysisData.get("brucellosis"));
-            if (analysisData.containsKey("hepatitisB")) analysis.setHepatitisB((String) analysisData.get("hepatitisB"));
-            if (analysisData.containsKey("hepatitisC")) analysis.setHepatitisC((String) analysisData.get("hepatitisC"));
-            if (analysisData.containsKey("syphilis")) analysis.setSyphilis((String) analysisData.get("syphilis"));
-            if (analysisData.containsKey("altLevel")) analysis.setAltLevel(Double.valueOf(analysisData.get("altLevel").toString()));
-            if (analysisData.containsKey("bloodGroup")) analysis.setBloodGroup((String) analysisData.get("bloodGroup"));
-            if (analysisData.containsKey("rhesusFactor")) analysis.setRhesusFactor((String) analysisData.get("rhesusFactor"));
-            if (analysisData.containsKey("hemoglobin")) analysis.setHemoglobin(Double.valueOf(analysisData.get("hemoglobin").toString()));
-            if (analysisData.containsKey("technicianNotes")) analysis.setTechnicianNotes((String) analysisData.get("technicianNotes"));
-
-            // Проверяем, все ли поля заполнены
-            if (analysis.isComplete()) {
-                analysis.setStatus("COMPLETED");
-
-                // Обновляем статус донации на основе eligibility
-                Donation donation = analysis.getDonation();
-                if (analysis.isDonorEligible()) {
-                    donation.setStatus("APPROVED");
-                } else {
-                    donation.setStatus("REJECTED");
-                }
-                donationRepository.save(donation);
-            } else {
-                // Если хотя бы одно поле заполнено, меняем статус с PENDING на IN_PROGRESS
-                if ("PENDING".equals(analysis.getStatus()) && hasAnyFieldFilled(analysisData)) {
-                    analysis.setStatus("IN_PROGRESS");
-                }
-            }
-
-            analysis.setAnalysisDate(LocalDateTime.now());
-            Analysis savedAnalysis = analysisRepository.save(analysis);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Analysis updated successfully");
-            response.put("analysisId", savedAnalysis.getAnalysisId());
-            response.put("status", savedAnalysis.getStatus());
-            response.put("isComplete", savedAnalysis.isComplete());
-
-            if (savedAnalysis.isComplete()) {
-                response.put("isDonorEligible", savedAnalysis.isDonorEligible());
-                response.put("donationStatus", savedAnalysis.getDonation().getStatus());
-            }
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // Частичное обновление (по одному полю)
-    @PatchMapping("/{analysisId}")
-    public ResponseEntity<?> patchAnalysis(@PathVariable Long analysisId,
-                                           @RequestBody Map<String, Object> updateFields) {
-        try {
-            Optional<Analysis> analysisOpt = analysisRepository.findById(analysisId);
-            if (analysisOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Analysis not found"));
-            }
-
-            Analysis analysis = analysisOpt.get();
-            boolean wasPending = "PENDING".equals(analysis.getStatus());
-            boolean hasChanges = false;
-
-            for (Map.Entry<String, Object> entry : updateFields.entrySet()) {
-                switch (entry.getKey()) {
-                    case "hiv":
-                        analysis.setHiv((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "brucellosis":
-                        analysis.setBrucellosis((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "hepatitisB":
-                        analysis.setHepatitisB((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "hepatitisC":
-                        analysis.setHepatitisC((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "syphilis":
-                        analysis.setSyphilis((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "altLevel":
-                        analysis.setAltLevel(Double.valueOf(entry.getValue().toString()));
-                        hasChanges = true;
-                        break;
-                    case "bloodGroup":
-                        analysis.setBloodGroup((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "rhesusFactor":
-                        analysis.setRhesusFactor((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                    case "hemoglobin":
-                        analysis.setHemoglobin(Double.valueOf(entry.getValue().toString()));
-                        hasChanges = true;
-                        break;
-                    case "technicianNotes":
-                        analysis.setTechnicianNotes((String) entry.getValue());
-                        hasChanges = true;
-                        break;
-                }
-            }
-
-            if (hasChanges) {
-                // Проверяем completeness
-                if (analysis.isComplete()) {
-                    analysis.setStatus("COMPLETED");
-                    Donation donation = analysis.getDonation();
-                    if (analysis.isDonorEligible()) {
-                        donation.setStatus("APPROVED");
-                    } else {
-                        donation.setStatus("REJECTED");
-                    }
-                    donationRepository.save(donation);
-                } else if (wasPending) {
-                    analysis.setStatus("IN_PROGRESS");
-                }
-
-                analysis.setAnalysisDate(LocalDateTime.now());
-                Analysis savedAnalysis = analysisRepository.save(analysis);
-                return ResponseEntity.ok(savedAnalysis);
-            }
-
-            return ResponseEntity.ok(analysis);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // Удалить анализ (если ошибка)
-    @DeleteMapping("/{analysisId}")
-    public ResponseEntity<?> deleteAnalysis(@PathVariable Long analysisId) {
-        try {
-            if (!analysisRepository.existsById(analysisId)) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Analysis not found"));
-            }
-            analysisRepository.deleteById(analysisId);
-            return ResponseEntity.ok(Map.of("message", "Analysis deleted successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // Получить статистику анализов для blood center
-    @GetMapping("/bloodcenter/{bloodCenterId}/stats")
-    public ResponseEntity<?> getAnalysisStats(@PathVariable Long bloodCenterId) {
-        try {
-            List<Analysis> analyses = analysisRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
-
-            long pending = analyses.stream().filter(a -> "PENDING".equals(a.getStatus())).count();
-            long inProgress = analyses.stream().filter(a -> "IN_PROGRESS".equals(a.getStatus())).count();
-            long completed = analyses.stream().filter(a -> "COMPLETED".equals(a.getStatus())).count();
-            long eligible = analyses.stream().filter(a -> "COMPLETED".equals(a.getStatus()) && a.isDonorEligible()).count();
-            long notEligible = completed - eligible;
-
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("total", analyses.size());
-            stats.put("pending", pending);
-            stats.put("inProgress", inProgress);
-            stats.put("completed", completed);
-            stats.put("eligible", eligible);
-            stats.put("notEligible", notEligible);
-
-            return ResponseEntity.ok(stats);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    private boolean hasAnyFieldFilled(Map<String, Object> data) {
-        return data.containsKey("hiv") || data.containsKey("brucellosis") ||
-                data.containsKey("hepatitisB") || data.containsKey("hepatitisC") ||
-                data.containsKey("syphilis") || data.containsKey("altLevel") ||
-                data.containsKey("bloodGroup") || data.containsKey("rhesusFactor") ||
-                data.containsKey("hemoglobin");
     }
 }

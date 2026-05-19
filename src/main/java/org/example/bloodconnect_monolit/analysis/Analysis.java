@@ -1,5 +1,6 @@
 package org.example.bloodconnect_monolit.analysis;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -58,6 +59,7 @@ public class Analysis {
 
     @OneToOne
     @JoinColumn(name = "donation_id", nullable = false)
+    @JsonIgnore
     private Donation donation;
 
     @ManyToOne

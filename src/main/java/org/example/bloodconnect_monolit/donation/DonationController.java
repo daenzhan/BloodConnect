@@ -142,4 +142,31 @@ public class DonationController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    // Добавьте в DonationController.java
+    @GetMapping("/appointment/{appointmentId}")
+    public ResponseEntity<?> getDonationByAppointmentId(@PathVariable Long appointmentId) {
+        try {
+            Optional<Donation> donationOpt = donationRepository.findByAppointment_AppointmentId(appointmentId);
+
+            if (donationOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                        "exists", false,
+                        "message", "Donation not found for this appointment"
+                ));
+            }
+
+            Donation donation = donationOpt.get();
+            return ResponseEntity.ok(Map.of(
+                    "donationId", donation.getDonationId(),
+                    "status", donation.getStatus(),
+                    "donationDate", donation.getDonationDate(),
+                    "hasAnalysis", donation.getHasAnalysis(),
+                    "appointmentId", donation.getAppointment().getAppointmentId()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

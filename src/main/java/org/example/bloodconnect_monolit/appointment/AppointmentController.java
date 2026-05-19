@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/appointments")
@@ -167,9 +168,48 @@ public class AppointmentController {
         }
     }
 
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД: теперь включает donation объект
     @GetMapping("/bloodcenter/{bloodCenterId}")
-    public ResponseEntity<List<Appointment>> getAppointmentsByBloodCenter(@PathVariable Long bloodCenterId) {
-        List<Appointment> appointments = appointmentRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
-        return ResponseEntity.ok(appointments);
+    public ResponseEntity<?> getAppointmentsByBloodCenter(@PathVariable Long bloodCenterId) {
+        try {
+            List<Appointment> appointments = appointmentRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
+
+            // Преобразуем каждый appointment в DTO с donation информацией
+            List<Map<String, Object>> appointmentsWithDonation = appointments.stream().map(appointment -> {
+                Map<String, Object> appointmentMap = Map.of(
+                        "appointmentId", appointment.getAppointmentId(),
+                        "appointmentDate", appointment.getAppointmentDate(),
+                        "status", appointment.getStatus(),
+                        "notes", appointment.getNotes() != null ? appointment.getNotes() : "",
+                        "donor", Map.of(
+                                "donorId", appointment.getDonor().getDonorId(),
+                                "firstName", appointment.getDonor().getFirstName(),
+                                "lastName", appointment.getDonor().getLastName(),
+                                "bloodGroup", appointment.getDonor().getBloodGroup() != null ? appointment.getDonor().getBloodGroup() : "",
+                                "rhesusFactor", appointment.getDonor().getRhesusFactor() != null ? appointment.getDonor().getRhesusFactor() : ""
+                        )
+                );
+
+                // Создаем изменяемую мапу
+                Map<String, Object> result = new java.util.HashMap<>(appointmentMap);
+
+                // Добавляем donation если существует
+                if (appointment.getDonation() != null) {
+                    result.put("donation", Map.of(
+                            "donationId", appointment.getDonation().getDonationId(),
+                            "status", appointment.getDonation().getStatus()
+                    ));
+                } else {
+                    result.put("donation", null);
+                }
+
+                return result;
+            }).collect(Collectors.toList());
+
+            return ResponseEntity.ok(appointmentsWithDonation);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }
