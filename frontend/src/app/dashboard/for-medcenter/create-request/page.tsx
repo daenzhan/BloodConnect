@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {FileText, ArrowLeft, CheckCircle, Loader2, ClipboardList, Plus} from "lucide-react"
+import {FileText, ArrowLeft, CheckCircle, Loader2, ClipboardList, Plus, Building2} from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
@@ -30,31 +30,34 @@ const getAuthHeaders = () => {
 const bloodGroups = ["A", "B", "AB", "O"]
 
 const rhesusFactors = [
-    { value: "Positive", label: "Positive (+)" },
-    { value: "Negative", label: "Negative (-)" }
+    { value: "POSITIVE", label: "Positive (+)" },
+    { value: "NEGATIVE", label: "Negative (-)" }
 ]
 
+// ТЕ ЖЕ КОМПОНЕНТЫ, ЧТО И В РЕЗЕРВАХ
 const componentTypes = [
     { value: "WHOLE_BLOOD", label: "Whole Blood" },
-    { value: "PLASMA", label: "Plasma" },
+    { value: "RED_BLOOD_CELLS", label: "Red Blood Cells" },
     { value: "PLATELETS", label: "Platelets" },
-    { value: "RED_CELLS", label: "Red Blood Cells" },
+    { value: "PLASMA", label: "Plasma" },
     { value: "CRYOPRECIPITATE", label: "Cryoprecipitate" }
 ]
 
 const volumeOptions = [
-    { value: "200ml", label: "200 ml" },
-    { value: "250ml", label: "250 ml" },
-    { value: "300ml", label: "300 ml" },
-    { value: "350ml", label: "350 ml" },
-    { value: "450ml", label: "450 ml" },
-    { value: "500ml", label: "500 ml" }
+    { value: "200 ml", label: "200 ml" },
+    { value: "250 ml", label: "250 ml" },
+    { value: "300 ml", label: "300 ml" },
+    { value: "350 ml", label: "350 ml" },
+    { value: "450 ml", label: "450 ml" },
+    { value: "500 ml", label: "500 ml" },
+    { value: "1000 ml", label: "1000 ml (1L)" }
 ]
 
-const unitOptions = [
-    { value: "ml", label: "ml" },
-    { value: "L", label: "L" }
-]
+interface BloodCenter {
+    bloodCenterId: number;
+    name: string;
+    location: string;
+}
 
 export default function CreateRequestPage() {
     const router = useRouter()
@@ -64,10 +67,10 @@ export default function CreateRequestPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [isCustomVolume, setIsCustomVolume] = useState(false)
-    const [customVolumeValue, setCustomVolumeValue] = useState("")
-    const [customVolumeUnit, setCustomVolumeUnit] = useState("ml")
     const [medCenter, setMedCenter] = useState<any>(null)
+    const [bloodCenters, setBloodCenters] = useState<BloodCenter[]>([])
+    const [selectedBloodCenterId, setSelectedBloodCenterId] = useState<string>("")
+    const [isLoadingCenters, setIsLoadingCenters] = useState(false)
 
     const [formData, setFormData] = useState({
         componentType: "",
@@ -77,6 +80,54 @@ export default function CreateRequestPage() {
         deadline: "",
         comment: ""
     })
+
+    // Fetch medical center info
+    useEffect(() => {
+        const fetchMedCenter = async () => {
+            if (!userId) return
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) return
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    setMedCenter(data)
+                }
+            } catch (error) {
+                console.error("Error fetching med center:", error)
+            }
+        }
+        fetchMedCenter()
+    }, [userId])
+
+    // Fetch all blood centers
+    useEffect(() => {
+        const fetchBloodCenters = async () => {
+            setIsLoadingCenters(true)
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) return
+
+                const response = await fetch("http://localhost:8080/blood-centers", {
+                    headers: headers
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    setBloodCenters(data)
+                } else {
+                    console.error("Failed to fetch blood centers")
+                }
+            } catch (error) {
+                console.error("Error fetching blood centers:", error)
+            } finally {
+                setIsLoadingCenters(false)
+            }
+        }
+        fetchBloodCenters()
+    }, [])
 
     const fetchMedCenterId = async (): Promise<number | null> => {
         try {
@@ -116,6 +167,12 @@ export default function CreateRequestPage() {
             return
         }
 
+        if (!selectedBloodCenterId) {
+            setError("Please select a blood center")
+            setIsSubmitting(false)
+            return
+        }
+
         const headers = getAuthHeaders();
         if (!headers) {
             window.location.href = '/auth/login';
@@ -130,12 +187,8 @@ export default function CreateRequestPage() {
         }
 
         let finalVolume = formData.volume
-        if (isCustomVolume && customVolumeValue) {
-            finalVolume = `${customVolumeValue}${customVolumeUnit}`
-        }
-
         if (!finalVolume) {
-            setError("Please select or enter a volume")
+            setError("Please select a volume")
             setIsSubmitting(false)
             return
         }
@@ -149,8 +202,11 @@ export default function CreateRequestPage() {
                 deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
                 comment: formData.comment || null,
                 status: "PENDING",
-                medCenter: { medCenterId: fetchedMedCenterId }
+                medCenter: { medCenterId: fetchedMedCenterId },
+                bloodCenter: { bloodCenterId: parseInt(selectedBloodCenterId) }
             }
+
+            console.log("Sending request:", requestData)
 
             const response = await fetch("http://localhost:8080/blood-requests/create", {
                 method: "POST",
@@ -166,6 +222,8 @@ export default function CreateRequestPage() {
             }
 
             if (!response.ok) {
+                const errorData = await response.text()
+                console.error("Server response:", errorData)
                 throw new Error("Failed to create request")
             }
 
@@ -180,26 +238,6 @@ export default function CreateRequestPage() {
             setIsSubmitting(false)
         }
     }
-
-    useEffect(() => {
-        const fetchMedCenter = async () => {
-            if (!userId) return
-            try {
-                const headers = getAuthHeaders()
-                if (!headers) return
-                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
-                    headers: headers
-                })
-                if (response.ok) {
-                    const data = await response.json()
-                    setMedCenter(data)
-                }
-            } catch (error) {
-                console.error("Error fetching med center:", error)
-            }
-        }
-        fetchMedCenter()
-    }, [userId])
 
     if (isSuccess) {
         return (
@@ -225,7 +263,7 @@ export default function CreateRequestPage() {
     return (
         <div className="w-full px-4 py-6 md:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
-                <div className="flex flex-col sm:flex-row  sm:justify-between gap-4 mb-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
                             <FileText className="w-6 h-6 text-primary" />
@@ -248,6 +286,39 @@ export default function CreateRequestPage() {
                 <Card className="p-4 md:p-6 rounded-2xl border border-border">
                     <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
 
+                        {/* Blood Center Selection - NEW */}
+                        <div className="space-y-2">
+                            <Label htmlFor="bloodCenter" className="text-sm font-medium">
+                                Blood Center <span className="text-red-500">*</span>
+                            </Label>
+                            <Select
+                                value={selectedBloodCenterId}
+                                onValueChange={setSelectedBloodCenterId}
+                                required
+                            >
+                                <SelectTrigger id="bloodCenter" className="w-full h-11 bg-white">
+                                    <SelectValue placeholder={isLoadingCenters ? "Loading blood centers..." : "Select blood center"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {bloodCenters.map((center) => (
+                                        <SelectItem key={center.bloodCenterId} value={center.bloodCenterId.toString()}>
+                                            <div className="flex items-center gap-2">
+                                                <Building2 className="w-4 h-4 text-gray-500" />
+                                                <span>{center.name}</span>
+                                                <span className="text-xs text-gray-400">({center.location})</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {bloodCenters.length === 0 && !isLoadingCenters && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                    No blood centers available. Please contact administrator.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Component Type */}
                         <div className="space-y-2">
                             <Label htmlFor="componentType" className="text-sm font-medium">
                                 Component type <span className="text-red-500">*</span>
@@ -268,8 +339,15 @@ export default function CreateRequestPage() {
                                     ))}
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground">
+                                {formData.componentType === "PLASMA" && "⚠️ Plasma requires 90 days quarantine before use"}
+                                {formData.componentType === "PLATELETS" && "📅 Platelets expire in 5 days"}
+                                {formData.componentType === "WHOLE_BLOOD" && "📅 Whole blood expires in 35 days"}
+                                {formData.componentType === "RED_BLOOD_CELLS" && "📅 Red blood cells expire in 42 days"}
+                            </p>
                         </div>
 
+                        {/* Blood Group and Rhesus Factor */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="bloodGroup" className="text-sm font-medium">
@@ -316,97 +394,30 @@ export default function CreateRequestPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <Label className="text-sm font-medium">
+                        {/* Volume */}
+                        <div className="space-y-2">
+                            <Label htmlFor="volume" className="text-sm font-medium">
                                 Volume <span className="text-red-500">*</span>
                             </Label>
-
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <Button
-                                    type="button"
-                                    variant={!isCustomVolume ? "default" : "outline"}
-                                    className={`flex-1 h-11 ${!isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
-                                    onClick={() => {
-                                        setIsCustomVolume(false)
-                                        setCustomVolumeValue("")
-                                    }}
-                                >
-                                    Select from list
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={isCustomVolume ? "default" : "outline"}
-                                    className={`flex-1 h-11 ${isCustomVolume ? 'bg-primary text-white' : 'bg-white'}`}
-                                    onClick={() => setIsCustomVolume(true)}
-                                >
-                                    Enter custom
-                                </Button>
-                            </div>
-
-                            {!isCustomVolume ? (
-                                <Select
-                                    value={formData.volume}
-                                    onValueChange={(value) => setFormData({ ...formData, volume: value })}
-                                    required={!isCustomVolume}
-                                >
-                                    <SelectTrigger id="volume" className="w-full h-11 bg-white">
-                                        <SelectValue placeholder="Select volume" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-60 overflow-y-auto">
-                                        {volumeOptions.map((vol) => (
-                                            <SelectItem key={vol.value} value={vol.value}>
-                                                {vol.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <div className="flex-1">
-                                        <Input
-                                            id="customVolume"
-                                            type="number"
-                                            min="0"
-                                            step="0.1"
-                                            placeholder="Enter amount"
-                                            value={customVolumeValue}
-                                            onChange={(e) => {
-                                                setCustomVolumeValue(e.target.value)
-                                                setFormData({ ...formData, volume: "" })
-                                            }}
-                                            className="w-full h-11 px-4 border border-input bg-white rounded-xl"
-                                            required={isCustomVolume}
-                                        />
-                                    </div>
-                                    <div className="w-full sm:w-32">
-                                        <Select
-                                            value={customVolumeUnit}
-                                            onValueChange={setCustomVolumeUnit}
-                                        >
-                                            <SelectTrigger className="w-full h-11 bg-white">
-                                                <SelectValue placeholder="Unit" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {unitOptions.map((unit) => (
-                                                    <SelectItem key={unit.value} value={unit.value}>
-                                                        {unit.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            )}
-
-                            {isCustomVolume && (
-                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    <span>Examples:</span>
-                                    <span className="bg-gray-100 px-2 py-1 rounded">450ml</span>
-                                    <span className="bg-gray-100 px-2 py-1 rounded">0.5L</span>
-                                    <span className="bg-gray-100 px-2 py-1 rounded">1L</span>
-                                    <span className="bg-gray-100 px-2 py-1 rounded">750ml</span>
-                                </div>
-                            )}
+                            <Select
+                                value={formData.volume}
+                                onValueChange={(value) => setFormData({ ...formData, volume: value })}
+                                required
+                            >
+                                <SelectTrigger id="volume" className="w-full h-11 bg-white">
+                                    <SelectValue placeholder="Select volume" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-60 overflow-y-auto">
+                                    {volumeOptions.map((vol) => (
+                                        <SelectItem key={vol.value} value={vol.value}>
+                                            {vol.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                💡 Standard blood donation is 450 ml
+                            </p>
                         </div>
 
                         {/* Deadline */}
@@ -421,6 +432,9 @@ export default function CreateRequestPage() {
                                 onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                                 className="rounded-xl w-full h-11 px-4 border border-input bg-white"
                             />
+                            <p className="text-xs text-muted-foreground">
+                                If not specified, request will be active until fulfilled
+                            </p>
                         </div>
 
                         {/* Comment */}
@@ -458,7 +472,7 @@ export default function CreateRequestPage() {
                             <Button
                                 type="submit"
                                 className="sm:flex-1 bg-primary hover:bg-primary/90 rounded-xl h-12 transition-all text-white"
-                                disabled={isSubmitting || !formData.componentType || !formData.bloodGroup || !formData.rhesusFactor || (!formData.volume && !customVolumeValue)}
+                                disabled={isSubmitting || !formData.componentType || !formData.bloodGroup || !formData.rhesusFactor || !formData.volume || !selectedBloodCenterId}
                             >
                                 {isSubmitting ? (
                                     <span className="flex items-center justify-center gap-2">

@@ -1,47 +1,49 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { BloodCenterSidebar } from "../components/sidebar";
 import { CenterProfileCard } from "../components/center-profile-card";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
+    SelectValue
 } from "@/components/ui/select";
 import {
-    Droplet,
-    Edit2,
-    AlertTriangle,
-    Package,
-    RefreshCw,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
     Search,
+    Droplet,
     AlertCircle,
-    CheckCircle,
-    Clock,
+    Package,
+    Calendar,
+    ChevronDown,
+    ChevronUp,
+    FlaskConical,
+    Syringe,
+    Heart,
+    Layers,
     Plus,
-    Zap
+    Loader2
 } from "lucide-react";
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    if (!token) {
-        console.error("No token found");
-        return null;
-    }
+    if (!token) return null;
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -60,72 +62,51 @@ const checkAuthAndRedirect = (response: Response) => {
     return false;
 };
 
-interface BloodReserveDetail {
-    reserveId: number;
-    componentType: string;
-    bloodGroup: string;
-    rhesusFactor: string;
-    quantity: number;
-    inQuarantine: boolean;
-    quarantineEndDate?: string;
-    isAvailable: boolean;
-    expirationDate: string;
-    createdDate: string;
-    donationId: number;
-    daysUntilExpiration: number;
-    isReady: boolean;
-}
+const componentLabels: Record<string, string> = {
+    "WHOLE_BLOOD": "Whole Blood",
+    "RED_BLOOD_CELLS": "Red Blood Cells",
+    "PLATELETS": "Platelets",
+    "PLASMA": "Plasma",
+    "CRYOPRECIPITATE": "Cryoprecipitate"
+};
 
-const componentTypes = [
-    { value: "WHOLE_BLOOD", label: "Whole Blood", icon: "🩸", color: "bg-red-100 text-red-700", defaultQty: 450 },
-    { value: "RED_BLOOD_CELLS", label: "Red Blood Cells", icon: "🔴", color: "bg-red-100 text-red-700", defaultQty: 250 },
-    { value: "PLATELETS", label: "Platelets", icon: "🟡", color: "bg-yellow-100 text-yellow-700", defaultQty: 200 },
-    { value: "PLASMA", label: "Plasma", icon: "💧", color: "bg-blue-100 text-blue-700", defaultQty: 250 },
-    { value: "CRYOPRECIPITATE", label: "Cryoprecipitate", icon: "❄️", color: "bg-purple-100 text-purple-700", defaultQty: 150 },
+const componentIcons: Record<string, any> = {
+    "WHOLE_BLOOD": Droplet,
+    "RED_BLOOD_CELLS": Heart,
+    "PLATELETS": FlaskConical,
+    "PLASMA": Syringe,
+    "CRYOPRECIPITATE": Package
+};
+
+const bloodGroups = ["A", "B", "AB", "O"];
+const rhesusFactors = [
+    { value: "POSITIVE", label: "Positive (+)" },
+    { value: "NEGATIVE", label: "Negative (-)" }
 ];
 
-const bloodGroups = [
-    { group: "A", rh: "+", label: "A+" },
-    { group: "A", rh: "-", label: "A-" },
-    { group: "B", rh: "+", label: "B+" },
-    { group: "B", rh: "-", label: "B-" },
-    { group: "AB", rh: "+", label: "AB+" },
-    { group: "AB", rh: "-", label: "AB-" },
-    { group: "O", rh: "+", label: "O+" },
-    { group: "O", rh: "-", label: "O-" },
-];
-
-export default function BloodReservePage() {
+export default function BloodReservesPage() {
+    const router = useRouter();
     const searchParams = useSearchParams();
     const userId = searchParams.get('userId');
     const [bloodCenterId, setBloodCenterId] = useState<number | null>(null);
-    const [allReserves, setAllReserves] = useState<BloodReserveDetail[]>([]);
-    const [filteredReserves, setFilteredReserves] = useState<BloodReserveDetail[]>([]);
+    const [groupedReserves, setGroupedReserves] = useState<any[]>([]);
+    const [filteredReserves, setFilteredReserves] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
-    const [selectedBloodGroup, setSelectedBloodGroup] = useState<string>("ALL");
-    const [selectedComponent, setSelectedComponent] = useState<string>("ALL");
+    const [filterComponent, setFilterComponent] = useState<string>("ALL");
+    const [filterBloodGroup, setFilterBloodGroup] = useState<string>("ALL");
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-    const [quickAddOpen, setQuickAddOpen] = useState(false);
-    const [quickAddData, setQuickAddData] = useState({
-        componentType: "WHOLE_BLOOD",
-        bloodGroup: "A",
-        rhesusFactor: "+",
-        quantity: 450
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        componentType: "",
+        bloodGroup: "",
+        rhesusFactor: "POSITIVE",
+        quantity: 450,
+        notes: ""
     });
-    const [isAdding, setIsAdding] = useState(false);
-
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
-    const [editingReserve, setEditingReserve] = useState<BloodReserveDetail | null>(null);
-    const [editQuantity, setEditQuantity] = useState("");
-
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/auth/login';
-        }
-    }, []);
 
     useEffect(() => {
         const fetchCenter = async () => {
@@ -143,7 +124,7 @@ export default function BloodReservePage() {
                 if (res.ok) {
                     const data = await res.json();
                     setBloodCenterId(data.bloodCenterId);
-                } else if (res.status === 404) {
+                } else {
                     setError("Blood center not found");
                 }
             } catch (err) {
@@ -154,480 +135,522 @@ export default function BloodReservePage() {
         fetchCenter();
     }, [userId]);
 
-    const fetchReserves = async () => {
+    const fetchGroupedReserves = async () => {
         if (!bloodCenterId) return;
         try {
             setIsLoading(true);
+            setError(null);
             const headers = getAuthHeaders();
-            if (!headers) {
-                window.location.href = '/auth/login';
-                return;
-            }
-            const response = await fetch(`http://localhost:8080/blood-reserves/bloodcenter/${bloodCenterId}`, {
+            if (!headers) return;
+
+            const res = await fetch(`http://localhost:8080/blood-reserves/bloodcenter/${bloodCenterId}/grouped`, {
                 headers: headers
             });
-            if (checkAuthAndRedirect(response)) return;
-            if (response.ok) {
-                const data = await response.json();
-                if (Array.isArray(data)) {
-                    setAllReserves(data);
-                    setFilteredReserves(data);
-                } else {
-                    setAllReserves([]);
-                    setFilteredReserves([]);
-                }
+
+            if (checkAuthAndRedirect(res)) return;
+
+            if (res.ok) {
+                const data = await res.json();
+                console.log("Grouped reserves:", data);
+                setGroupedReserves(data);
+                setFilteredReserves(data);
+            } else {
+                setError("Failed to fetch blood reserves");
             }
         } catch (err) {
-            console.error("Error fetching reserves:", err);
-            setError("Failed to load reserves");
+            console.error("Error fetching grouped reserves:", err);
+            setError("Network error");
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchReserves();
+        fetchGroupedReserves();
     }, [bloodCenterId]);
 
     useEffect(() => {
-        let filtered = [...allReserves];
+        let filtered = groupedReserves;
+
+        if (filterComponent !== "ALL") {
+            filtered = filtered.filter(item => item.componentType === filterComponent);
+        }
+
+        if (filterBloodGroup !== "ALL") {
+            filtered = filtered.filter(item => item.bloodGroup === filterBloodGroup);
+        }
 
         if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
-            filtered = filtered.filter(r =>
-                r.componentType.toLowerCase().includes(searchLower) ||
-                r.bloodGroup.toLowerCase().includes(searchLower)
+            filtered = filtered.filter(item =>
+                componentLabels[item.componentType].toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.bloodGroup.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                `${item.bloodGroup}${item.rhesusFactor === "POSITIVE" ? "+" : "-"}`.includes(searchTerm.toUpperCase())
             );
-        }
-
-        if (selectedBloodGroup !== "ALL") {
-            filtered = filtered.filter(r =>
-                `${r.bloodGroup}${r.rhesusFactor === "POSITIVE" ? "+" : "-"}` === selectedBloodGroup
-            );
-        }
-
-        if (selectedComponent !== "ALL") {
-            filtered = filtered.filter(r => r.componentType === selectedComponent);
         }
 
         setFilteredReserves(filtered);
-    }, [searchTerm, selectedBloodGroup, selectedComponent, allReserves]);
+    }, [filterComponent, filterBloodGroup, searchTerm, groupedReserves]);
 
-    const reservesByBloodType = () => {
-        const grouped: Record<string, BloodReserveDetail[]> = {};
-        filteredReserves.forEach(reserve => {
-            const key = `${reserve.bloodGroup}${reserve.rhesusFactor === "POSITIVE" ? "+" : "-"}`;
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(reserve);
-        });
-        return grouped;
+    const toggleExpand = (key: string) => {
+        const newExpanded = new Set(expandedGroups);
+        if (newExpanded.has(key)) {
+            newExpanded.delete(key);
+        } else {
+            newExpanded.add(key);
+        }
+        setExpandedGroups(newExpanded);
     };
 
-    const handleQuickAdd = async () => {
+    const formatDate = (dateString: string) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        const daysUntilExpiration = Math.ceil((date.getTime() - Date.now()) / (1000 * 3600 * 24));
+
+        if (daysUntilExpiration < 0) return "Expired";
+        if (daysUntilExpiration === 0) return "Today";
+        if (daysUntilExpiration <= 7) return `${daysUntilExpiration} days (⚠️ Soon)`;
+        return `${daysUntilExpiration} days`;
+    };
+
+    const getExpirationColor = (dateString: string) => {
+        if (!dateString) return "text-gray-500";
+        const daysUntil = Math.ceil((new Date(dateString).getTime() - Date.now()) / (1000 * 3600 * 24));
+        if (daysUntil < 0) return "text-red-600";
+        if (daysUntil <= 7) return "text-orange-600";
+        return "text-green-600";
+    };
+
+    const formatDateDisplay = (dateString: string) => {
+        if (!dateString) return "N/A";
+        return new Date(dateString).toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    };
+
+    const handleCreateReserve = async () => {
         if (!bloodCenterId) {
-            alert("Blood center not found");
+            setError("Blood center not found");
             return;
         }
 
-        setIsAdding(true);
+        if (!createForm.componentType || !createForm.bloodGroup || !createForm.quantity) {
+            setError("Please fill all required fields");
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+
         try {
             const headers = getAuthHeaders();
             if (!headers) return;
 
-            const response = await fetch(`http://localhost:8080/blood-reserves/create-manual`, {
+            const requestData = {
+                bloodCenterId: bloodCenterId,
+                componentType: createForm.componentType,
+                bloodGroup: createForm.bloodGroup,
+                rhesusFactor: createForm.rhesusFactor,
+                quantity: createForm.quantity,
+                notes: createForm.notes || "Manually added to inventory"
+            };
+
+            const response = await fetch("http://localhost:8080/blood-reserves/create-manual", {
                 method: "POST",
                 headers: headers,
-                body: JSON.stringify({
-                    bloodCenterId: bloodCenterId,
-                    componentType: quickAddData.componentType,
-                    bloodGroup: quickAddData.bloodGroup,
-                    rhesusFactor: quickAddData.rhesusFactor,
-                    quantity: quickAddData.quantity,
-                    notes: "Manually added to inventory"
-                })
+                body: JSON.stringify(requestData)
             });
 
-            const text = await response.text();
-            let result;
-            try {
-                result = text ? JSON.parse(text) : {};
-            } catch (e) {
-                result = { message: text || "Operation completed" };
-            }
+            if (checkAuthAndRedirect(response)) return;
 
             if (response.ok) {
-                alert(result.message || "Component added successfully!");
-                setQuickAddOpen(false);
-                setQuickAddData({
-                    componentType: "WHOLE_BLOOD",
-                    bloodGroup: "A",
-                    rhesusFactor: "+",
-                    quantity: 450
+                const data = await response.json();
+                console.log("Reserve created:", data);
+                setIsCreateModalOpen(false);
+                setCreateForm({
+                    componentType: "",
+                    bloodGroup: "",
+                    rhesusFactor: "POSITIVE",
+                    quantity: 450,
+                    notes: ""
                 });
-                await fetchReserves();
+                await fetchGroupedReserves();
             } else {
-                alert(result.error || "Failed to add component");
+                const error = await response.json();
+                setError(error.error || "Failed to create reserve");
             }
-
         } catch (err) {
-            console.error("Error adding component:", err);
-            alert("Network error. Please try again.");
+            console.error("Error creating reserve:", err);
+            setError("Network error while creating reserve");
         } finally {
-            setIsAdding(false);
+            setIsSubmitting(false);
         }
-    };
-
-    const handleEditQuantity = async () => {
-        if (!editingReserve) return;
-        const newQuantity = parseInt(editQuantity);
-        if (isNaN(newQuantity) || newQuantity < 0) {
-            alert("Please enter a valid quantity");
-            return;
-        }
-
-        try {
-            const headers = getAuthHeaders();
-            if (!headers) return;
-
-            const response = await fetch(`http://localhost:8080/blood-reserves/${editingReserve.reserveId}/quantity`, {
-                method: "PUT",
-                headers: headers,
-                body: JSON.stringify({ quantity: newQuantity })
-            });
-
-            const text = await response.text();
-            let result;
-            try {
-                result = text ? JSON.parse(text) : {};
-            } catch (e) {
-                result = { message: text || "Operation completed" };
-            }
-
-            if (response.ok) {
-                alert(result.message || "Quantity updated successfully!");
-                await fetchReserves();
-                setEditDialogOpen(false);
-            } else {
-                alert(result.error || "Failed to update quantity");
-            }
-
-        } catch (err) {
-            console.error("Error updating quantity:", err);
-            alert("Network error");
-        }
-    };
-
-    const getStatusBadge = (reserve: BloodReserveDetail) => {
-        if (!reserve.isReady) return { label: "Quarantine", color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock };
-        if (reserve.daysUntilExpiration <= 7 && reserve.daysUntilExpiration > 0) return { label: "Expiring Soon", color: "bg-orange-100 text-orange-700 border-orange-200", icon: AlertTriangle };
-        if (reserve.daysUntilExpiration <= 0) return { label: "Expired", color: "bg-red-100 text-red-700 border-red-200", icon: AlertCircle };
-        return { label: "Available", color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle };
     };
 
     if (!userId) {
-        return (
-            <div className="flex min-h-screen bg-background">
-                <BloodCenterSidebar userId={userId} />
-                <main className="flex-1 p-6">
-                    <Card className="p-6 text-center">
-                        <p className="text-destructive">Access Denied: User ID not found</p>
-                    </Card>
-                </main>
-            </div>
-        );
+        return <div className="flex"><BloodCenterSidebar userId={userId} /><main className="flex-1 p-6">Access Denied</main></div>;
     }
-
-    if (isLoading) {
-        return (
-            <div className="flex min-h-screen bg-background">
-                <BloodCenterSidebar userId={userId} />
-                <main className="flex-1 p-6 flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                        <p className="text-muted-foreground">Loading inventory...</p>
-                    </div>
-                </main>
-            </div>
-        );
-    }
-
-    const groupedReserves = reservesByBloodType();
-    const bloodGroupOrder = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
     return (
         <>
             <BloodCenterSidebar userId={userId} />
-            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto bg-background">
-                <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
+                <header className="flex justify-between items-start mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold">Blood Inventory</h1>
-                        <p className="text-muted-foreground">Track and manage blood components</p>
+                        <h1 className="text-3xl font-bold">Blood Reserves</h1>
+                        <p className="text-muted-foreground">View and manage your blood inventory</p>
                     </div>
-                    <div className="flex gap-3">
-                        <Button onClick={() => setQuickAddOpen(true)} className="bg-primary hover:bg-primary/90">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Quick Add
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={fetchReserves}>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Refresh
-                        </Button>
-                        <CenterProfileCard userId={userId} />
-                    </div>
-                </div>
+                    <CenterProfileCard userId={userId} />
+                </header>
 
+                {/* Filters Card - теперь с кнопкой в одной строке */}
                 <Card className="p-4 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="relative">
+                    <div className="flex flex-col md:flex-row gap-3">
+                        <div className="flex-1 relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search by type or blood group..."
+                                placeholder="Search by component or blood type..."
+                                className="pl-10 h-9"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9"
                             />
                         </div>
-                        <Select value={selectedBloodGroup} onValueChange={setSelectedBloodGroup}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Blood Types" />
+
+                        <Select value={filterComponent} onValueChange={setFilterComponent}>
+                            <SelectTrigger className="w-full md:w-48 h-9">
+                                <SelectValue placeholder="Filter by component" />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-card" position="popper" side="bottom" align="start">
-                                <SelectItem value="ALL">All Blood Types</SelectItem>
-                                {bloodGroups.map(bg => (
-                                    <SelectItem key={bg.label} value={bg.label}>{bg.label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedComponent} onValueChange={setSelectedComponent}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Components" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-card" position="popper" side="bottom" align="start">
+                            <SelectContent>
                                 <SelectItem value="ALL">All Components</SelectItem>
-                                {componentTypes.map(ct => (
-                                    <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                                {Object.entries(componentLabels).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
+
+                        <Select value={filterBloodGroup} onValueChange={setFilterBloodGroup}>
+                            <SelectTrigger className="w-full md:w-40 h-9">
+                                <SelectValue placeholder="Filter by blood group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">All Blood Groups</SelectItem>
+                                <SelectItem value="A">A</SelectItem>
+                                <SelectItem value="B">B</SelectItem>
+                                <SelectItem value="AB">AB</SelectItem>
+                                <SelectItem value="O">O</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9"
+                            onClick={() => {
+                                setFilterComponent("ALL");
+                                setFilterBloodGroup("ALL");
+                                setSearchTerm("");
+                            }}
+                        >
+                            Clear Filters
+                        </Button>
+
+                        {/* Кнопка Add Blood - в одной линии с фильтрами */}
+                        <Button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            size="sm"
+                            className="bg-primary hover:bg-primary/90 h-9 px-3"
+                        >
+                            <Plus className="w-3.5 h-3.5 mr-1" />
+                            Add Blood
+                        </Button>
                     </div>
                 </Card>
 
-                {filteredReserves.length === 0 ? (
+                {error && (
+                    <Card className="p-4 mb-6 bg-red-50 border-red-200">
+                        <div className="flex items-center gap-2 text-red-600">
+                            <AlertCircle className="w-5 h-5" />
+                            <span>{error}</span>
+                        </div>
+                    </Card>
+                )}
+
+                {isLoading ? (
                     <Card className="p-12 text-center">
-                        <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                        <p className="text-muted-foreground">No components found</p>
-                        <Button variant="outline" className="mt-4" onClick={() => setQuickAddOpen(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add First Component
-                        </Button>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                        <p className="mt-4 text-muted-foreground">Loading blood reserves...</p>
+                    </Card>
+                ) : filteredReserves.length === 0 ? (
+                    <Card className="p-12 text-center text-muted-foreground">
+                        <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-semibold">No blood reserves found</p>
+                        <p className="text-sm">Add blood components to start building your inventory</p>
                     </Card>
                 ) : (
-                    <div className="space-y-6">
-                        {bloodGroupOrder.map(bloodType => {
-                            const reservesForType = groupedReserves[bloodType] || [];
-                            if (reservesForType.length === 0) return null;
+                    <div className="space-y-4">
+                        {filteredReserves.map((group, idx) => {
+                            const Icon = componentIcons[group.componentType] || Droplet;
+                            const groupKey = `${group.componentType}_${group.bloodGroup}_${group.rhesusFactor}_${idx}`;
+                            const isExpanded = expandedGroups.has(groupKey);
 
                             return (
-                                <div key={bloodType}>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <Droplet className="w-5 h-5 text-primary" />
-                                        </div>
-                                        <h2 className="text-xl font-semibold">Blood Type {bloodType}</h2>
-                                        <Badge variant="secondary" className="ml-2">
-                                            {reservesForType.length} unit{reservesForType.length !== 1 ? 's' : ''}
-                                        </Badge>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {reservesForType.map((reserve) => {
-                                            const component = componentTypes.find(ct => ct.value === reserve.componentType);
-                                            const status = getStatusBadge(reserve);
-                                            const StatusIcon = status.icon;
-                                            return (
-                                                <Card key={reserve.reserveId} className="p-4 hover:shadow-md transition-all group">
-                                                    <div className="flex justify-between items-start mb-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-10 h-10 rounded-full ${component?.color || "bg-gray-100"} flex items-center justify-center text-xl`}>
-                                                                {component?.icon || "🩸"}
-                                                            </div>
-                                                            <div>
-                                                                <h3 className="font-semibold">{component?.label || reserve.componentType}</h3>
-                                                                <p className="text-xs text-muted-foreground">ID: {reserve.reserveId}</p>
-                                                            </div>
-                                                        </div>
-                                                        <Badge variant="outline" className={status.color}>
-                                                            <StatusIcon className="w-3 h-3 mr-1" />
-                                                            {status.label}
+                                <Card key={groupKey} className="overflow-hidden border-2 hover:border-primary/20 transition-colors">
+                                    <div
+                                        className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                                        onClick={() => toggleExpand(groupKey)}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
+                                                    <Icon className="w-7 h-7 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h3 className="font-bold text-xl">
+                                                            {group.bloodGroup}{group.rhesusFactor === "POSITIVE" ? "+" : "-"}
+                                                        </h3>
+                                                        <Badge variant="outline" className="text-sm">
+                                                            {componentLabels[group.componentType]}
+                                                        </Badge>
+                                                        <Badge variant="secondary" className="bg-blue-100">
+                                                            <Layers className="w-3 h-3 mr-1" />
+                                                            {group.unitsCount} units
                                                         </Badge>
                                                     </div>
-
-                                                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Quantity</p>
-                                                            <p className="text-2xl font-bold text-primary">{reserve.quantity} <span className="text-sm font-normal text-muted-foreground">ml</span></p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Created</p>
-                                                            <p className="font-medium">{new Date(reserve.createdDate).toLocaleDateString()}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Expires</p>
-                                                            <p className={`font-medium ${reserve.daysUntilExpiration <= 7 ? "text-orange-600" : ""}`}>
-                                                                {new Date(reserve.expirationDate).toLocaleDateString()}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Donation ID</p>
-                                                            <p className="font-medium">#{reserve.donationId}</p>
-                                                        </div>
+                                                    <div className="flex gap-4 text-sm text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3" />
+                                                            Earliest expiry: {formatDate(group.oldestExpiration)}
+                                                        </span>
                                                     </div>
-
-                                                    {reserve.inQuarantine && reserve.quarantineEndDate && (
-                                                        <div className="mt-2 p-2 bg-yellow-50 rounded-lg flex items-center gap-2 text-xs">
-                                                            <Clock className="w-3 h-3 text-yellow-600" />
-                                                            <span className="text-yellow-600">Quarantine until {new Date(reserve.quarantineEndDate).toLocaleDateString()}</span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="mt-3 pt-3 border-t flex justify-end">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setEditingReserve(reserve);
-                                                                setEditQuantity(reserve.quantity.toString());
-                                                                setEditDialogOpen(true);
-                                                            }}
-                                                        >
-                                                            <Edit2 className="w-3 h-3 mr-1" />
-                                                            Edit Quantity
-                                                        </Button>
-                                                    </div>
-                                                </Card>
-                                            );
-                                        })}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-right">
+                                                    <p className="text-3xl font-bold text-primary">
+                                                        {group.totalQuantity} ml
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">total volume</p>
+                                                </div>
+                                                {isExpanded ? (
+                                                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                                                ) : (
+                                                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+
+                                    {isExpanded && (
+                                        <div className="border-t p-4 bg-gray-50">
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <Package className="w-4 h-4" />
+                                                Individual Blood Units ({group.unitsCount} units)
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {group.reserves.map((reserve: any) => (
+                                                    <div
+                                                        key={reserve.reserveId}
+                                                        className="bg-white p-3 rounded-lg border hover:shadow-md transition-shadow"
+                                                    >
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div>
+                                                                <p className="font-mono text-sm font-semibold">Unit #{reserve.reserveId}</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Donation: #{reserve.donationId}
+                                                                </p>
+                                                            </div>
+                                                            <Badge variant={reserve.available ? "default" : "secondary"}>
+                                                                {reserve.available ? "Available" : "Unavailable"}
+                                                            </Badge>
+                                                        </div>
+
+                                                        <div className="flex justify-between items-center mt-2 pt-2 border-t">
+                                                            <div>
+                                                                <p className="text-sm text-muted-foreground">Quantity</p>
+                                                                <p className="font-bold text-lg">{reserve.quantity} ml</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-sm text-muted-foreground">Expires</p>
+                                                                <p className={`text-sm font-medium ${getExpirationColor(reserve.expirationDate)}`}>
+                                                                    {formatDateDisplay(reserve.expirationDate)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
+                                                            <span>Created: {formatDateDisplay(reserve.createdDate)}</span>
+                                                            {reserve.inQuarantine && (
+                                                                <Badge variant="outline" className="bg-yellow-50">
+                                                                    In Quarantine
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+
+                                                        {reserve.notes && (
+                                                            <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                                                                📝 {reserve.notes}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </Card>
                             );
                         })}
                     </div>
                 )}
+
+                {/* Статистика */}
+                {filteredReserves.length > 0 && (
+                    <Card className="p-4 mt-6 bg-gradient-to-r from-primary/5 to-primary/10">
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                            <Package className="w-4 h-4" />
+                            Inventory Summary
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Units</p>
+                                <p className="text-2xl font-bold">
+                                    {filteredReserves.reduce((sum: number, g: any) => sum + g.unitsCount, 0)}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Volume</p>
+                                <p className="text-2xl font-bold">
+                                    {filteredReserves.reduce((sum: number, g: any) => sum + g.totalQuantity, 0)} ml
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Component Types</p>
+                                <p className="text-2xl font-bold">
+                                    {new Set(filteredReserves.map((g: any) => g.componentType)).size}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Blood Groups</p>
+                                <p className="text-2xl font-bold">
+                                    {new Set(filteredReserves.map((g: any) => `${g.bloodGroup}${g.rhesusFactor === "POSITIVE" ? "+" : "-"}`)).size}
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
             </main>
 
-            <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
-                <DialogContent className="max-w-md">
+            {/* Модальное окно */}
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-primary" />
-                            Quick Add Component
+                            <Plus className="w-5 h-5" />
+                            Add Blood Manually
                         </DialogTitle>
                     </DialogHeader>
+
                     <div className="space-y-4 py-4">
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Component Type</label>
+                        <div className="space-y-2">
+                            <Label htmlFor="componentType">Component Type *</Label>
                             <Select
-                                value={quickAddData.componentType}
-                                onValueChange={(value) => {
-                                    const ct = componentTypes.find(c => c.value === value);
-                                    setQuickAddData({
-                                        ...quickAddData,
-                                        componentType: value,
-                                        quantity: ct?.defaultQty || 250
-                                    });
-                                }}
+                                value={createForm.componentType}
+                                onValueChange={(value) => setCreateForm({...createForm, componentType: value})}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select component type" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-card" position="popper" side="bottom" align="start">
-                                    {componentTypes.map(ct => (
-                                        <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                                <SelectContent>
+                                    {Object.entries(componentLabels).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>{label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Blood Type</label>
-                            <div className="grid grid-cols-2 gap-3">
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="bloodGroup">Blood Group *</Label>
                                 <Select
-                                    value={quickAddData.bloodGroup}
-                                    onValueChange={(value) => setQuickAddData({...quickAddData, bloodGroup: value})}
+                                    value={createForm.bloodGroup}
+                                    onValueChange={(value) => setCreateForm({...createForm, bloodGroup: value})}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Group" />
+                                        <SelectValue placeholder="Select" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-white dark:bg-card" position="popper" side="bottom" align="start">
-                                        <SelectItem value="A">A</SelectItem>
-                                        <SelectItem value="B">B</SelectItem>
-                                        <SelectItem value="AB">AB</SelectItem>
-                                        <SelectItem value="O">O</SelectItem>
+                                    <SelectContent>
+                                        {bloodGroups.map(group => (
+                                            <SelectItem key={group} value={group}>{group}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="rhesusFactor">Rhesus Factor *</Label>
                                 <Select
-                                    value={quickAddData.rhesusFactor}
-                                    onValueChange={(value) => setQuickAddData({...quickAddData, rhesusFactor: value})}
+                                    value={createForm.rhesusFactor}
+                                    onValueChange={(value) => setCreateForm({...createForm, rhesusFactor: value})}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Rh" />
+                                        <SelectValue placeholder="Select" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-white dark:bg-card" position="popper" side="bottom" align="start">
-                                        <SelectItem value="+">Positive (+)</SelectItem>
-                                        <SelectItem value="-">Negative (-)</SelectItem>
+                                    <SelectContent>
+                                        {rhesusFactors.map(rh => (
+                                            <SelectItem key={rh.value} value={rh.value}>{rh.label}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Quantity (ml)</label>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="quantity">Quantity (ml) *</Label>
                             <Input
+                                id="quantity"
                                 type="number"
-                                value={quickAddData.quantity}
-                                onChange={(e) => setQuickAddData({...quickAddData, quantity: parseInt(e.target.value) || 0})}
-                                min="1"
+                                value={createForm.quantity}
+                                onChange={(e) => setCreateForm({...createForm, quantity: parseInt(e.target.value) || 0})}
+                                min={1}
+                                max={1000}
+                                step={50}
+                            />
+                            <p className="text-xs text-muted-foreground">Standard donation: 450 ml</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="notes">Notes (Optional)</Label>
+                            <Textarea
+                                id="notes"
+                                placeholder="Any additional information..."
+                                value={createForm.notes}
+                                onChange={(e) => setCreateForm({...createForm, notes: e.target.value})}
+                                rows={2}
                             />
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
-                        <Button onClick={handleQuickAdd} disabled={isAdding} className="bg-primary hover:bg-primary/90">
-                            {isAdding ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Adding...</> : "Add Component"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Edit Quantity</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        {editingReserve && (
-                            <>
-                                <div className="text-center">
-                                    <div className="text-lg font-semibold">
-                                        {componentTypes.find(c => c.value === editingReserve.componentType)?.label}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {editingReserve.bloodGroup}{editingReserve.rhesusFactor === "POSITIVE" ? "+" : "-"}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Current Quantity: {editingReserve.quantity} ml</label>
-                                    <Input
-                                        type="number"
-                                        value={editQuantity}
-                                        onChange={(e) => setEditQuantity(e.target.value)}
-                                        min="0"
-                                        className="text-center text-lg"
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleEditQuantity}>Save Changes</Button>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleCreateReserve}
+                            disabled={isSubmitting || !createForm.componentType || !createForm.bloodGroup || createForm.quantity <= 0}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Adding...
+                                </>
+                            ) : (
+                                <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add to Inventory
+                                </>
+                            )}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

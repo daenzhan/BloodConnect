@@ -5,16 +5,16 @@ import org.example.bloodconnect_monolit.analysis.Analysis;
 import org.example.bloodconnect_monolit.analysis.AnalysisRepository;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenter;
 import org.example.bloodconnect_monolit.bloodCenter.BloodCenterRepository;
+import org.example.bloodconnect_monolit.bloodRequest.BloodRequest;
+import org.example.bloodconnect_monolit.bloodRequest.BloodRequestRepository;
 import org.example.bloodconnect_monolit.donation.Donation;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/blood-reserves")
@@ -26,6 +26,7 @@ public class BloodReserveController {
     private final DonationRepository donationRepository;
     private final AnalysisRepository analysisRepository;
     private final BloodCenterRepository bloodCenterRepository;
+    private final BloodRequestRepository bloodRequestRepository;
 
     @PostMapping("/create-from-analysis/{analysisId}")
     public ResponseEntity<?> createFromAnalysis(
@@ -290,6 +291,175 @@ public class BloodReserveController {
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Добавьте в BloodRequestController.java
+    @PostMapping("/{requestId}/execute")
+    public ResponseEntity<?> executeBloodRequest(@PathVariable Long requestId) {
+        try {
+            // 1. Найти заявку
+            Optional<BloodRequest> requestOpt = bloodRequestRepository.findById(requestId);
+            if (requestOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Blood request not found"));
+            }
+
+            BloodRequest request = requestOpt.get();
+
+            // 2. Проверить статус заявки
+            if (!"PENDING".equals(request.getStatus())) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Cannot execute request with status: " + request.getStatus()
+                ));
+            }
+
+            // 3. Парсим объем из строки (например "500 ml" -> 500)
+            int requestedVolume = parseVolume(request.getVolume());
+
+            // 4. Найти подходящие резервы
+            List<BloodReserve> suitableReserves = bloodReserveRepository.findSuitableReserves(
+                    request.getBloodCenter().getBloodCenterId(),
+                    request.getComponentType(),
+                    request.getBloodGroup(),
+                    request.getRhesusFactor(),
+                    LocalDateTime.now()
+            );
+
+            if (suitableReserves.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "No suitable blood reserves found for this request"
+                ));
+            }
+
+            // 5. Списать кровь из резервов (FIFO - сначала старые)
+            int remainingToFulfill = requestedVolume;
+            int usedReservesCount = 0;
+            List<Map<String, Object>> usedReserves = new java.util.ArrayList<>();
+
+            for (BloodReserve reserve : suitableReserves) {
+                if (remainingToFulfill <= 0) break;
+
+                int availableQuantity = reserve.getQuantity();
+                int takenQuantity = Math.min(availableQuantity, remainingToFulfill);
+
+                // Обновляем количество
+                reserve.setQuantity(availableQuantity - takenQuantity);
+                bloodReserveRepository.save(reserve);
+
+                remainingToFulfill -= takenQuantity;
+                usedReservesCount++;
+
+                Map<String, Object> used = new HashMap<>();
+                used.put("reserveId", reserve.getReserveId());
+                used.put("quantityUsed", takenQuantity);
+                used.put("remainingQuantity", reserve.getQuantity());
+                used.put("componentType", reserve.getComponentType());
+                used.put("bloodGroup", reserve.getBloodGroup());
+                used.put("rhesusFactor", reserve.getRhesusFactor());
+                usedReserves.add(used);
+            }
+
+            // 6. Проверить, удалось ли полностью выполнить заявку
+            if (remainingToFulfill > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Insufficient blood quantity",
+                        "requestedVolume", requestedVolume,
+                        "fulfilledVolume", requestedVolume - remainingToFulfill,
+                        "missingVolume", remainingToFulfill
+                ));
+            }
+
+            // 7. Обновить статус заявки
+            request.setStatus("COMPLETED");
+            bloodRequestRepository.save(request);
+
+            // 8. Вернуть результат
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Blood request executed successfully");
+            response.put("requestId", requestId);
+            response.put("fulfilledVolume", requestedVolume);
+            response.put("reservesUsed", usedReservesCount);
+            response.put("usedReserves", usedReserves);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private int parseVolume(String volumeStr) {
+        if (volumeStr == null) return 0;
+        // Извлекаем число из строки типа "500 ml", "250ml", "1 L" и т.д.
+        String digits = volumeStr.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return 0;
+
+        int volume = Integer.parseInt(digits);
+
+        // Если указано в литрах, конвертируем в мл
+        if (volumeStr.toLowerCase().contains("l") && !volumeStr.toLowerCase().contains("ml")) {
+            volume *= 1000;
+        }
+
+        return volume;
+    }
+
+    // В BloodReserveController.java добавьте этот метод
+    @GetMapping("/bloodcenter/{bloodCenterId}/grouped")
+    public ResponseEntity<?> getGroupedReserves(@PathVariable Long bloodCenterId) {
+        try {
+            List<BloodReserve> reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
+
+            // Фильтруем только доступные, не в карантине и не просроченные
+            List<BloodReserve> availableReserves = reserves.stream()
+                    .filter(r -> r.getIsAvailable() && !r.getInQuarantine() &&
+                            r.getExpirationDate().isAfter(LocalDateTime.now()) &&
+                            r.getQuantity() > 0)
+                    .collect(Collectors.toList());
+
+            // Группируем на бэкенде без отдельного DTO
+            Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
+
+            for (BloodReserve reserve : availableReserves) {
+                String key = reserve.getComponentType() + "_" +
+                        reserve.getBloodGroup() + "_" +
+                        reserve.getRhesusFactor();
+
+                if (!grouped.containsKey(key)) {
+                    Map<String, Object> group = new HashMap<>();
+                    group.put("componentType", reserve.getComponentType());
+                    group.put("bloodGroup", reserve.getBloodGroup());
+                    group.put("rhesusFactor", reserve.getRhesusFactor());
+                    group.put("totalQuantity", 0);
+                    group.put("unitsCount", 0);
+                    group.put("oldestExpiration", reserve.getExpirationDate());
+                    group.put("newestExpiration", reserve.getExpirationDate());
+                    group.put("reserves", new ArrayList<BloodReserve>());
+                    grouped.put(key, group);
+                }
+
+                Map<String, Object> group = grouped.get(key);
+                group.put("totalQuantity", (Integer)group.get("totalQuantity") + reserve.getQuantity());
+                group.put("unitsCount", (Integer)group.get("unitsCount") + 1);
+                ((List<BloodReserve>)group.get("reserves")).add(reserve);
+
+                LocalDateTime oldest = (LocalDateTime) group.get("oldestExpiration");
+                if (reserve.getExpirationDate().isBefore(oldest)) {
+                    group.put("oldestExpiration", reserve.getExpirationDate());
+                }
+
+                LocalDateTime newest = (LocalDateTime) group.get("newestExpiration");
+                if (reserve.getExpirationDate().isAfter(newest)) {
+                    group.put("newestExpiration", reserve.getExpirationDate());
+                }
+            }
+
+            return ResponseEntity.ok(new ArrayList<>(grouped.values()));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 }

@@ -12,7 +12,6 @@ public interface BloodReserveRepository extends JpaRepository<BloodReserve, Long
 
     List<BloodReserve> findByBloodCenter_BloodCenterId(Long bloodCenterId);
 
-    // Убедитесь, что этот метод возвращает List, а не Optional
     List<BloodReserve> findByDonationId(Long donationId);
 
     List<BloodReserve> findByBloodCenter_BloodCenterIdAndComponentType(
@@ -30,4 +29,21 @@ public interface BloodReserveRepository extends JpaRepository<BloodReserve, Long
             "WHERE br.bloodCenter.bloodCenterId = :bloodCenterId AND br.isAvailable = true " +
             "GROUP BY br.bloodGroup, br.rhesusFactor")
     List<Object[]> getInventoryStats(@Param("bloodCenterId") Long bloodCenterId);
+
+    // Поиск подходящих резервов для выполнения заявки
+    @Query("SELECT br FROM BloodReserve br WHERE " +
+            "br.bloodCenter.bloodCenterId = :bloodCenterId " +
+            "AND br.componentType = :componentType " +
+            "AND br.bloodGroup = :bloodGroup " +
+            "AND UPPER(br.rhesusFactor) = UPPER(:rhesusFactor) " +
+            "AND br.isAvailable = true " +
+            "AND br.inQuarantine = false " +
+            "AND br.expirationDate > :currentDate " +
+            "AND br.quantity > 0 " +
+            "ORDER BY br.expirationDate ASC")
+    List<BloodReserve> findSuitableReserves(@Param("bloodCenterId") Long bloodCenterId,
+                                            @Param("componentType") String componentType,
+                                            @Param("bloodGroup") String bloodGroup,
+                                            @Param("rhesusFactor") String rhesusFactor,
+                                            @Param("currentDate") LocalDateTime currentDate);
 }
