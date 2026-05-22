@@ -1,5 +1,6 @@
 package org.example.bloodconnect_monolit.bloodreserve;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.example.bloodconnect_monolit.analysis.Analysis;
 import org.example.bloodconnect_monolit.analysis.AnalysisRepository;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -459,6 +461,180 @@ public class BloodReserveController {
 
         } catch (Exception e) {
             e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Получить все резервы в карантине
+    @GetMapping("/quarantine/{bloodCenterId}")
+    public ResponseEntity<?> getQuarantineReserves(@PathVariable Long bloodCenterId) {
+        try {
+            List<BloodReserve> quarantineReserves = bloodReserveRepository
+                    .findByBloodCenter_BloodCenterIdAndInQuarantineTrue(bloodCenterId);
+
+            // Фильтруем только те, где карантин еще не закончился или плазма
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (BloodReserve reserve : quarantineReserves) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("reserveId", reserve.getReserveId());
+                item.put("componentType", reserve.getComponentType());
+                item.put("bloodGroup", reserve.getBloodGroup());
+                item.put("rhesusFactor", reserve.getRhesusFactor());
+                item.put("quantity", reserve.getQuantity());
+                item.put("quarantineEndDate", reserve.getQuarantineEndDate());
+                item.put("createdDate", reserve.getCreatedDate());
+                item.put("donationId", reserve.getDonationId());
+                item.put("donorId", reserve.getDonorId());
+                item.put("notes", reserve.getNotes());
+
+                // Рассчитываем оставшиеся дни карантина
+                if (reserve.getQuarantineEndDate() != null) {
+                    long daysRemaining = ChronoUnit.DAYS.between(
+                            LocalDateTime.now(), reserve.getQuarantineEndDate()
+                    );
+                    item.put("daysRemaining", Math.max(0, daysRemaining));
+                    item.put("isQuarantineExpired", daysRemaining <= 0);
+                } else {
+                    item.put("daysRemaining", 0);
+                    item.put("isQuarantineExpired", false);
+                }
+
+                result.add(item);
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Ручной вывод из карантина (для плазмы)
+    @PostMapping("/{reserveId}/release-from-quarantine")
+    @Transactional
+    public ResponseEntity<?> releaseFromQuarantine(@PathVariable Long reserveId) {
+        try {
+            Optional<BloodReserve> reserveOpt = bloodReserveRepository.findById(reserveId);
+            if (reserveOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reserve not found"));
+            }
+
+            BloodReserve reserve = reserveOpt.get();
+
+            if (!reserve.getInQuarantine()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reserve is not in quarantine"));
+            }
+
+            // Выводим из карантина
+            reserve.setInQuarantine(false);
+            reserve.setQuarantineEndDate(null);
+
+            // Для плазмы: после вывода из карантина все равно нужна проверка
+            if ("PLASMA".equals(reserve.getComponentType())) {
+                reserve.setIsAvailable(false); // Становится доступной только после подтверждения
+                reserve.setNotes((reserve.getNotes() != null ? reserve.getNotes() + "; " : "") +
+                        "Released from quarantine manually on " + LocalDateTime.now());
+            } else {
+                reserve.setIsAvailable(true);
+            }
+
+            bloodReserveRepository.save(reserve);
+
+            // Для плазмы возвращаем флаг, что нужна проверка
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Reserve released from quarantine");
+            response.put("reserveId", reserveId);
+            response.put("needsTesting", "PLASMA".equals(reserve.getComponentType()));
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Подтверждение пригодности плазмы (после выхода из карантина)
+    @PostMapping("/{reserveId}/confirm-plasma-suitability")
+    @Transactional
+    public ResponseEntity<?> confirmPlasmaSuitability(
+            @PathVariable Long reserveId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Optional<BloodReserve> reserveOpt = bloodReserveRepository.findById(reserveId);
+            if (reserveOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reserve not found"));
+            }
+
+            BloodReserve reserve = reserveOpt.get();
+
+            String isSuitable = (String) request.get("isSuitable");
+            String testResults = (String) request.get("testResults");
+            String technicianNotes = (String) request.get("technicianNotes");
+
+            if ("YES".equals(isSuitable)) {
+                // ПЛАЗМА СТАНОВИТСЯ ДОСТУПНОЙ
+                reserve.setIsAvailable(true);
+                reserve.setNotes((reserve.getNotes() != null ? reserve.getNotes() + "; " : "") +
+                        "Plasma confirmed suitable on " + LocalDateTime.now() +
+                        ". Test results: " + testResults +
+                        (technicianNotes != null ? ". Notes: " + technicianNotes : ""));
+            } else {
+                // НЕПРИГОДНАЯ ПЛАЗМА - УДАЛЯЕМ ИЗ ИНВЕНТАРЯ
+                reserve.setIsAvailable(false);
+                reserve.setQuantity(0); // Обнуляем количество
+                reserve.setNotes((reserve.getNotes() != null ? reserve.getNotes() + "; " : "") +
+                        "Plasma marked as unsuitable on " + LocalDateTime.now() +
+                        ". Reason: " + testResults +
+                        (technicianNotes != null ? ". Notes: " + technicianNotes : ""));
+            }
+
+            bloodReserveRepository.save(reserve);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", isSuitable.equals("YES") ? "Plasma marked as suitable and now available" : "Plasma marked as unsuitable and removed from inventory",
+                    "isAvailable", reserve.getIsAvailable()
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Автоматическая проверка и вывод из карантина (для запланированного задания)
+    @PostMapping("/auto-release-expired-quarantine")
+    public ResponseEntity<?> autoReleaseExpiredQuarantine() {
+        try {
+            List<BloodReserve> quarantineReserves = bloodReserveRepository
+                    .findByInQuarantineTrue();
+
+            int released = 0;
+            int needsTesting = 0;
+
+            for (BloodReserve reserve : quarantineReserves) {
+                if (reserve.getQuarantineEndDate() != null &&
+                        reserve.getQuarantineEndDate().isBefore(LocalDateTime.now())) {
+
+                    reserve.setInQuarantine(false);
+                    reserve.setQuarantineEndDate(null);
+
+                    if ("PLASMA".equals(reserve.getComponentType())) {
+                        reserve.setIsAvailable(false); // Требует проверки
+                        needsTesting++;
+                    } else {
+                        reserve.setIsAvailable(true);
+                    }
+
+                    bloodReserveRepository.save(reserve);
+                    released++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Auto-release completed",
+                    "releasedCount", released,
+                    "needsTestingCount", needsTesting
+            ));
+
+        } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }

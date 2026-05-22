@@ -25,6 +25,12 @@ public interface BloodReserveRepository extends JpaRepository<BloodReserve, Long
 
     List<BloodReserve> findByBloodCenter_BloodCenterIdAndInQuarantineTrue(Long bloodCenterId);
 
+    // ДОБАВЬТЕ ЭТОТ МЕТОД - поиск всех резервов в карантине
+    List<BloodReserve> findByInQuarantineTrue();
+
+    // ИЛИ полный вариант с указанием bloodCenterId (рекомендую)
+    // List<BloodReserve> findByBloodCenter_BloodCenterIdAndInQuarantineTrue(Long bloodCenterId);
+
     @Query("SELECT br.bloodGroup, br.rhesusFactor, COUNT(br) FROM BloodReserve br " +
             "WHERE br.bloodCenter.bloodCenterId = :bloodCenterId AND br.isAvailable = true " +
             "GROUP BY br.bloodGroup, br.rhesusFactor")
