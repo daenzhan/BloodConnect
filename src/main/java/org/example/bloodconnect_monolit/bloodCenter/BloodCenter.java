@@ -67,7 +67,7 @@ public class BloodCenter {
 
     @OneToMany(mappedBy = "bloodCenter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
-    private List<org.example.bloodconnect_monolit.bloodreserve.BloodReserve> bloodReserves = new ArrayList<>();
+    private List<org.example.bloodconnect_monolit.bloodReserve.BloodReserve> bloodReserves = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

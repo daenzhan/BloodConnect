@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { MapPin, X } from "lucide-react"
+import {FileText, MapPin, Upload, X} from "lucide-react"
 import type { BloodCenterData } from "@/app/auth/auth-types"
 import { LocationPicker } from "./location-picker"
 import { LocationPickerClient } from "./location-picker-client"
@@ -15,6 +15,7 @@ interface BloodCenterFormProps {
 
 export function BloodCenterForm({ data, onChange }: BloodCenterFormProps) {
     const [isMapOpen, setIsMapOpen] = useState(false)
+    const [selectedFileName, setSelectedFileName] = useState<string>("")
 
     const handleLocationSelect = (lat: number, lng: number, address: string) => {
         onChange({
@@ -23,6 +24,17 @@ export function BloodCenterForm({ data, onChange }: BloodCenterFormProps) {
             longitude: lng,
             location: address || data.location
         })
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null
+        if (file) {
+            setSelectedFileName(file.name)
+            onChange({ ...data, licenseFile: file })
+        } else {
+            setSelectedFileName("")
+            onChange({ ...data, licenseFile: null })
+        }
     }
 
     return (
@@ -117,18 +129,30 @@ export function BloodCenterForm({ data, onChange }: BloodCenterFormProps) {
             </div>
 
             <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="licenseFile">License Document</Label>
-                <Input
-                    id="licenseFile"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) =>
-                        onChange({ ...data, licenseFile: e.target.files?.[0] || null })
-                    }
-                    className="cursor-pointer"
-                />
+                <Label htmlFor="licenseFile" className="flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    License Document *
+                </Label>
+                <div className="relative">
+                    <Input
+                        id="licenseFile"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileChange}
+                        className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                        required
+                    />
+                </div>
+                {selectedFileName && (
+                    <div className="mt-1 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2">
+                        <Upload className="w-3 h-3 text-green-600" />
+                        <span className="text-xs text-green-700 dark:text-green-400">
+                            Selected: {selectedFileName}
+                        </span>
+                    </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                    Upload your medical license (PDF, JPG, or PNG)
+                    Upload your medical license (PDF, JPG, or PNG). Max size: 10MB
                 </p>
             </div>
 

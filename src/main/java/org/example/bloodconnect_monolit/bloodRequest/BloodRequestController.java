@@ -1,7 +1,7 @@
 package org.example.bloodconnect_monolit.bloodRequest;
 
-import org.example.bloodconnect_monolit.bloodreserve.BloodReserve;
-import org.example.bloodconnect_monolit.bloodreserve.BloodReserveRepository;
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserveRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;

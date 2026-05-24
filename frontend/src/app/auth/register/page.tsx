@@ -16,7 +16,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {sendVerificationCode, verifyCode, register, checkPhoneExists, checkEmailExists} from "@/app/auth/auth-api"
+import {
+    sendVerificationCode,
+    verifyCode,
+    register,
+    checkPhoneExists,
+    checkEmailExists,
+    uploadLicenseFile
+} from "@/app/auth/auth-api"
 import type { Role, BaseRegistrationData, DonorData, BloodCenterData, MedicalCenterData } from "@/app/auth/auth-types"
 import { DonorForm } from "@/components/registration/donor-form"
 import { BloodCenterForm } from "@/components/registration/blood-center-form"
@@ -202,6 +209,32 @@ export default function RegisterPage() {
         }
     }
 
+    const updateProfileLicense = async (userId: number, type: string, fileName: string) => {
+        const token = localStorage.getItem('token');
+        let url = '';
+        if (type === 'BLOOD_CENTER') {
+            const centerResponse = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const centerData = await centerResponse.json();
+            url = `http://localhost:8080/blood-centers/${centerData.bloodCenterId}/license`;
+        } else {
+            const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const centerData = await centerResponse.json();
+            url = `http://localhost:8080/medcenter/${centerData.medCenterId}/license`;
+        }
+        await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ licenseFile: fileName })
+        });
+    };
+
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -214,15 +247,22 @@ export default function RegisterPage() {
         setIsLoading(true)
 
         try {
-            const requestData = {
+            const requestData: any = {
                 email: baseData.email,
                 password: baseData.password,
                 confirmPassword: baseData.confirmPassword,
                 phoneNumber: baseData.phoneNumber,
                 role: baseData.role,
-                ...(baseData.role === "DONOR" && { donorData }),
-                ...(baseData.role === "BLOOD_CENTER" && { bloodCenterData }),
-                ...(baseData.role === "MEDICAL_CENTER" && { medicalCenterData }),
+            };
+
+            if (baseData.role === "DONOR") {
+                requestData.donorData = donorData;
+            } else if (baseData.role === "BLOOD_CENTER") {
+                const { licenseFile, ...bloodCenterDataWithoutFile } = bloodCenterData;
+                requestData.bloodCenterData = bloodCenterDataWithoutFile;
+            } else if (baseData.role === "MEDICAL_CENTER") {
+                const { licenseFile, ...medicalCenterDataWithoutFile } = medicalCenterData;
+                requestData.medicalCenterData = medicalCenterDataWithoutFile;
             }
 
             console.log('Request data being sent:', requestData);
@@ -230,6 +270,28 @@ export default function RegisterPage() {
             const response = await register(requestData)
             const role = response.role
             const userId = response.userId
+
+            if (userId && (baseData.role === "BLOOD_CENTER" || baseData.role === "MEDICAL_CENTER")) {
+                let fileToUpload: File | null = null;
+                let type = "";
+                if (baseData.role === "BLOOD_CENTER" && bloodCenterData.licenseFile) {
+                    fileToUpload = bloodCenterData.licenseFile;
+                    type = "BLOOD_CENTER";
+                } else if (baseData.role === "MEDICAL_CENTER" && medicalCenterData.licenseFile) {
+                    fileToUpload = medicalCenterData.licenseFile;
+                    type = "MEDICAL_CENTER";
+                }
+                if (fileToUpload) {
+                    try {
+                        const uploadResult = await uploadLicenseFile(fileToUpload, type, userId);
+                        console.log('License uploaded:', uploadResult);
+                        await updateProfileLicense(userId, type, uploadResult.fileName);
+                    } catch (uploadError) {
+                        console.error('Failed to upload license:', uploadError);
+                        setError("Account created but license upload failed. Please contact support.");
+                    }
+                }
+            }
 
             if (role === "DONOR") router.push(`/dashboard/for-donor?userId=${userId}`)
             else if (role === "BLOOD_CENTER") router.push(`/dashboard/for-bloodcenter?userId=${userId}`)

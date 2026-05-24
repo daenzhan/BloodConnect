@@ -1,4 +1,4 @@
-package org.example.bloodconnect_monolit.bloodreserve;
+package org.example.bloodconnect_monolit.bloodReserve;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

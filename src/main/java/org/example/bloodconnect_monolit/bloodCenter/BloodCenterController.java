@@ -5,8 +5,8 @@ import org.example.bloodconnect_monolit.donation.DonationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.example.bloodconnect_monolit.bloodreserve.BloodReserve;
-import org.example.bloodconnect_monolit.bloodreserve.BloodReserveRepository;
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserveRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -235,5 +235,22 @@ public class BloodCenterController {
         response.put("monthlyData", monthlyData);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{bloodCenterId}/license")
+    public ResponseEntity<?> updateLicense(@PathVariable Long bloodCenterId, @RequestBody Map<String, String> request) {
+        try {
+            String licenseFile = request.get("licenseFile");
+            Optional<BloodCenter> centerOpt = bloodCenterRepository.findById(bloodCenterId);
+            if (centerOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            BloodCenter center = centerOpt.get();
+            center.setLicenseFile(licenseFile);
+            bloodCenterRepository.save(center);
+            return ResponseEntity.ok(Map.of("message", "License updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 }

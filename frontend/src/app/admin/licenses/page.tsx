@@ -121,6 +121,14 @@ export default function AdminLicensesPage() {
         }
     };
 
+    const handleViewLicense = (license: License) => {
+        if (license.licenseFile && license.licenseFile !== 'null') {
+            window.open(`http://localhost:8080/api/files/download/${license.licenseFile}`, '_blank');
+        } else {
+            alert('No license file uploaded');
+        }
+    };
+
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString("en-US", {
             year: "numeric",
@@ -173,7 +181,7 @@ export default function AdminLicensesPage() {
 
                                     <div className="mt-3 flex flex-wrap gap-2">
                                         <button
-                                            onClick={() => window.open(`http://localhost:8080/uploads/${license.licenseFile}`, '_blank')}
+                                            onClick={() => handleViewLicense(license)}
                                             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                                         >
                                             <FileText className="w-4 h-4" />

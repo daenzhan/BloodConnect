@@ -3,6 +3,8 @@ package org.example.bloodconnect_monolit.medCenter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -45,5 +47,22 @@ public class MedCenterController {
     public ResponseEntity<MedCenter> createMedCenter(@RequestBody MedCenter medCenter) {
         MedCenter savedMedCenter = medCenterRepository.save(medCenter);
         return ResponseEntity.ok(savedMedCenter);
+    }
+
+    @PutMapping("/{medCenterId}/license")
+    public ResponseEntity<?> updateLicense(@PathVariable Long medCenterId, @RequestBody Map<String, String> request) {
+        try {
+            String licenseFile = request.get("licenseFile");
+            Optional<MedCenter> centerOpt = medCenterRepository.findById(medCenterId);
+            if (centerOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            MedCenter center = centerOpt.get();
+            center.setLicenseFile(licenseFile);
+            medCenterRepository.save(center);
+            return ResponseEntity.ok(Map.of("message", "License updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {User, Building2, MapPin, Phone, FileText, Save, Edit2, Calendar, ArrowLeft, Loader2} from "lucide-react"
+import { User, Building2, MapPin, FileText, Save, Edit2, Calendar, ArrowLeft, Loader2 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+import { ProfileCard } from "@/app/dashboard/for-medcenter/components/profile-card"
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -73,9 +73,8 @@ export default function ProfilePage() {
                     localStorage.removeItem('token');
                     localStorage.removeItem('user');
                     window.location.href = '/auth/login';
-                    return null;
+                    return;
                 }
-
 
                 console.log("Response status:", response.status)
 
@@ -133,7 +132,7 @@ export default function ProfilePage() {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 window.location.href = '/auth/login';
-                return null;
+                return;
             }
 
             if (response.ok) {
@@ -161,6 +160,14 @@ export default function ProfilePage() {
             year: "numeric"
         })
     }
+
+    const handleViewLicense = () => {
+        if (profile?.licenseFile && profile.licenseFile !== 'null') {
+            window.open(`http://localhost:8080/api/files/download/${profile.licenseFile}`, '_blank');
+        } else {
+            alert('No license file uploaded');
+        }
+    };
 
     if (isLoading) {
         return (
@@ -190,167 +197,175 @@ export default function ProfilePage() {
     return (
         <div className="w-full px-4 py-6 md:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto">
-        <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                        <User className="w-6 h-6 text-primary" />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                            <User className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground">Medical Center Profile</h1>
+                            <p className="text-sm text-muted-foreground">View and manage your center information</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">Medical center profile</h1>
-                    </div>
-                </div>
-                {!isEditing ? (
-                    <Button
-                        variant="outline"
-                        className="gap-2 rounded-xl"
-                        onClick={() => setIsEditing(true)}
-                    >
-                        <Edit2 className="w-4 h-4" />
-                        Edit
-                    </Button>
-                ) : (
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            className="rounded-xl"
-                            onClick={() => {
-                                setIsEditing(false)
-                                setEditedProfile(profile)
-                                setError(null)
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            className="bg-primary hover:bg-primary/90 gap-2 rounded-xl"
-                            onClick={handleSave}
-                            disabled={isSaving}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4 mr-2" />
-                                    Save changes
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                )}
-
-                {profile && (
                     <ProfileCard
                         name={profile.name}
                         location={profile.location}
                         userId={userId || ""}
                     />
-                )}
-            </div>
-
-
-            <Card className="p-6 rounded-3xl border border-border mb-6">
-                <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-primary" />
-                    Center information
-                </h2>
-
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
-                        {isEditing ? (
-                            <Input
-                                id="name"
-                                value={editedProfile.name || ""}
-                                onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
-                                className="rounded-xl"
-                            />
-                        ) : (
-                            <p className="text-foreground p-3 bg-muted/50 rounded-xl">{profile.name}</p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="location" className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            Location
-                        </Label>
-                        {isEditing ? (
-                            <Input
-                                id="location"
-                                value={editedProfile.location || ""}
-                                onChange={(e) => setEditedProfile({ ...editedProfile, location: e.target.value })}
-                                className="rounded-xl"
-                            />
-                        ) : (
-                            <p className="text-foreground p-3 bg-muted/50 rounded-xl">{profile.location}</p>
-                        )}
-                    </div>
-
-
-                    <div className="space-y-2">
-                        <Label htmlFor="specialization">Specialization</Label>
-                        {isEditing ? (
-                            <Input
-                                id="specialization"
-                                value={editedProfile.specialization || ""}
-                                onChange={(e) => setEditedProfile({ ...editedProfile, specialization: e.target.value })}
-                                className="rounded-xl"
-                            />
-                        ) : (
-                            <p className="text-foreground p-3 bg-muted/50 rounded-xl">
-                                {profile.specialization || "Not specified"}
-                            </p>
-                        )}
-                    </div>
                 </div>
-            </Card>
 
-            <Card className="p-6 rounded-2xl border border-border">
-                <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-primary" />
-                    Additional details
-                </h2>
-
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="directorFullName">Director's full name</Label>
-                        {isEditing ? (
-                            <Input
-                                id="directorFullName"
-                                value={editedProfile.directorFullName || ""}
-                                onChange={(e) => setEditedProfile({ ...editedProfile, directorFullName: e.target.value })}
+                <div className="flex justify-end mb-6">
+                    {!isEditing ? (
+                        <Button
+                            variant="outline"
+                            className="gap-2 rounded-xl"
+                            onClick={() => setIsEditing(true)}
+                        >
+                            <Edit2 className="w-4 h-4" />
+                            Edit Profile
+                        </Button>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
                                 className="rounded-xl"
-                            />
-                        ) : (
-                            <p className="text-foreground p-3 bg-muted/50 rounded-xl">
-                                {profile.directorFullName || "Not specified"}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>License file</Label>
-                        <p className="text-foreground p-3 bg-muted/50 rounded-xl">
-                            {profile.licenseFile || "No license file uploaded"}
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            Member since
-                        </Label>
-                        <p className="text-foreground p-3 bg-muted/50 rounded-xl">
-                            {formatDate(profile.createdAt)}
-                        </p>
-                    </div>
+                                onClick={() => {
+                                    setIsEditing(false)
+                                    setEditedProfile(profile)
+                                    setError(null)
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                className="bg-primary hover:bg-primary/90 gap-2 rounded-xl"
+                                onClick={handleSave}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-4 h-4 mr-2" />
+                                        Save Changes
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
                 </div>
-            </Card>
-        </div>
+
+                <Card className="p-6 rounded-2xl border border-border mb-6">
+                    <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-primary" />
+                        Center Information
+                    </h2>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Name</Label>
+                            {isEditing ? (
+                                <Input
+                                    id="name"
+                                    value={editedProfile.name || ""}
+                                    onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                    {profile.name}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="location" className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                Location
+                            </Label>
+                            {isEditing ? (
+                                <Input
+                                    id="location"
+                                    value={editedProfile.location || ""}
+                                    onChange={(e) => setEditedProfile({ ...editedProfile, location: e.target.value })}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                    {profile.location}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="specialization">Specialization</Label>
+                            {isEditing ? (
+                                <Input
+                                    id="specialization"
+                                    value={editedProfile.specialization || ""}
+                                    onChange={(e) => setEditedProfile({ ...editedProfile, specialization: e.target.value })}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                    {profile.specialization || "Not specified"}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="directorFullName">Director's Full Name</Label>
+                            {isEditing ? (
+                                <Input
+                                    id="directorFullName"
+                                    value={editedProfile.directorFullName || ""}
+                                    onChange={(e) => setEditedProfile({ ...editedProfile, directorFullName: e.target.value })}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                    {profile.directorFullName || "Not specified"}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                License Document
+                            </Label>
+                            <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                {profile.licenseFile ? (
+                                    <button
+                                        onClick={handleViewLicense}
+                                        className="text-primary hover:underline flex items-center gap-2"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        View License Document
+                                    </button>
+                                ) : (
+                                    "No license file uploaded"
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4" />
+                                Member Since
+                            </Label>
+                            <div className="p-3 bg-muted/50 rounded-xl text-foreground">
+                                {formatDate(profile.createdAt)}
+                            </div>
+                        </div>
+                    </div>
+                </Card>
             </div>
         </div>
     )

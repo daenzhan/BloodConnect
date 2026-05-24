@@ -1,4 +1,4 @@
-package org.example.bloodconnect_monolit.bloodreserve;
+package org.example.bloodconnect_monolit.bloodReserve;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

@@ -129,6 +129,28 @@ export async function login(email: string, password: string): Promise<AuthRespon
     }
 }
 
+export async function uploadLicenseFile(file: File, type: string, userId: number): Promise<{ fileName: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    formData.append('id', userId.toString());
+
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:8080/api/files/upload/license', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to upload license');
+    }
+
+    return response.json();
+}
+
 export async function sendVerificationCode(email: string): Promise<{ message: string; email: string }> {
     console.log('sendVerificationCode called for:', email);
     try {
@@ -233,6 +255,7 @@ export async function checkPhoneExists(phone: string): Promise<{ exists: boolean
     return response.data;
 }
 
+
 function transformToBackendFormat(frontendData: any): any {
     console.log('Frontend data received in transform:', frontendData);
     console.log('Confirm password value:', frontendData.confirmPassword);
@@ -274,6 +297,7 @@ function transformToBackendFormat(frontendData: any): any {
             bloodCenterDirectorFullName: bloodCenterData.directorFullName || '',
             latitude: bloodCenterData.latitude || 0,
             longitude: bloodCenterData.longitude || 0,
+            bloodCenterLicenseFile: bloodCenterData.bloodCenterLicenseFile,
         });
     }
 
@@ -283,6 +307,7 @@ function transformToBackendFormat(frontendData: any): any {
             medCenterLocation: medicalCenterData.location || '',
             medCenterSpecialization: medicalCenterData.specialization || '',
             medCenterDirectorFullName: medicalCenterData.directorFullName || '',
+            medCenterLicenseFile: medicalCenterData.medCenterLicenseFile,
         });
     }
 
