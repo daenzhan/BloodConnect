@@ -32,7 +32,6 @@ export function Sidebar() {
         { icon: Calendar, label: "Appointments", href: `/dashboard/for-donor/appointments?userId=${userId}`, matchExact: false },
         { icon: MapPin, label: "Find Centers", href: `/dashboard/for-donor/find-centers?userId=${userId}`, matchExact: false },
         { icon: FileText, label: "Analysis Results", href: `/dashboard/for-donor/analysis?userId=${userId}`, matchExact: false },
-        { icon: MessageSquare, label: "AI Assistant", href: `/dashboard/for-donor/ai-chat?userId=${userId}`, matchExact: false },
         { icon: User, label: "Top Donors", href: `/dashboard/for-donor/top-donors?userId=${userId}`, matchExact: false },
     ];
 

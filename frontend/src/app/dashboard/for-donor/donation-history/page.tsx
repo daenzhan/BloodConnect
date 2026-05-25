@@ -7,7 +7,9 @@ import { Droplet, Calendar, MapPin, FileText, Clock, XCircle, CheckCircle, Chevr
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "../components/sidebar";
-import {ProfileCard} from "@/app/dashboard/for-donor/components/profile-card";
+import { ProfileCard } from "@/app/dashboard/for-donor/components/profile-card";
+import { AiChatBot } from "../components/AiChatBot";
+import { DonorContextProvider, useDonorContext } from "../components/DonorContextProvider";
 
 interface Donation {
     donationId: number;
@@ -20,13 +22,15 @@ interface Donation {
     hasAnalysis: boolean;
 }
 
-export default function DonationHistoryPage() {
+// Внутренний компонент с контентом страницы
+function DonationHistoryContent() {
     const [donations, setDonations] = useState<Donation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const searchParams = useSearchParams();
     const userId = searchParams.get('userId') || searchParams.get('id');
+    const { donorData } = useDonorContext();
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
@@ -161,10 +165,9 @@ export default function DonationHistoryPage() {
         return donation.status?.toUpperCase() === statusFilter.toUpperCase();
     });
 
-
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 flex items-center justify-center min-h-screen">
                     <div className="text-center">
@@ -172,14 +175,13 @@ export default function DonationHistoryPage() {
                         <p className="text-muted-foreground">Loading donation history...</p>
                     </div>
                 </main>
-            </div>
+            </>
         );
     }
 
-
     if (error) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6">
                     <Card className="p-12 text-center">
@@ -196,14 +198,13 @@ export default function DonationHistoryPage() {
                         </button>
                     </Card>
                 </main>
-            </div>
+            </>
         );
     }
 
-
     if (!userId || userId === 'null') {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6">
                     <Card className="p-6 text-center">
@@ -216,13 +217,12 @@ export default function DonationHistoryPage() {
                         </button>
                     </Card>
                 </main>
-            </div>
+            </>
         );
     }
 
-
     return (
-        <div className="min-h-screen bg-background">
+        <>
             <Sidebar />
             <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
                 <header className="flex items-start justify-between mb-8">
@@ -383,6 +383,21 @@ export default function DonationHistoryPage() {
                     </div>
                 )}
             </main>
+            <AiChatBot userId={userId} donorContext={donorData} />
+        </>
+    );
+}
+
+// Основной компонент с провайдером
+export default function DonationHistoryPage() {
+    const searchParams = useSearchParams();
+    const userId = searchParams.get('userId') || searchParams.get('id') || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null);
+
+    return (
+        <div className="min-h-screen bg-background">
+            <DonorContextProvider userId={userId}>
+                <DonationHistoryContent />
+            </DonorContextProvider>
         </div>
     );
 }

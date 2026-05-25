@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, MapPin, XCircle, Plus, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "../components/sidebar";
-import {ProfileCard} from "@/app/dashboard/for-donor/components/profile-card";
+import { ProfileCard } from "@/app/dashboard/for-donor/components/profile-card";
+import { AiChatBot } from "../components/AiChatBot";
+import { DonorContextProvider, useDonorContext } from "../components/DonorContextProvider";
 
 interface Appointment {
     appointmentId: number;
@@ -19,7 +21,8 @@ interface Appointment {
     };
 }
 
-export default function AppointmentsPage() {
+// Внутренний компонент с контентом страницы
+function AppointmentsContent() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -27,6 +30,7 @@ export default function AppointmentsPage() {
     const searchParams = useSearchParams();
     const userIdFromUrl = searchParams.get('userId') || searchParams.get('id');
     const [userId, setUserId] = useState<string | null>(null);
+    const { donorData } = useDonorContext();
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
@@ -39,7 +43,6 @@ export default function AppointmentsPage() {
             'Authorization': `Bearer ${token}`
         };
     };
-
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -64,7 +67,6 @@ export default function AppointmentsPage() {
             setError("No user ID found");
         }
     }, [userIdFromUrl, router]);
-
 
     useEffect(() => {
         const fetchAppointments = async () => {
@@ -137,7 +139,6 @@ export default function AppointmentsPage() {
 
             if (response.ok) {
                 alert("Appointment cancelled successfully!");
-                // Обновляем список
                 const fetchResponse = await fetch(`http://localhost:8080/appointments/donor/${userId}`, {
                     method: 'GET',
                     headers: headers
@@ -293,69 +294,55 @@ export default function AppointmentsPage() {
         );
     };
 
-
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background">
-                <Sidebar />
-                <main className="ml-20 lg:ml-64 p-6 flex items-center justify-center min-h-screen">
-                    <div className="text-center">
-                        <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-                        <p className="text-muted-foreground">Loading appointments...</p>
-                    </div>
-                </main>
-            </div>
+            <main className="ml-20 lg:ml-64 p-6 flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading appointments...</p>
+                </div>
+            </main>
         );
     }
-
 
     if (error) {
         return (
-            <div className="min-h-screen bg-background">
-                <Sidebar />
-                <main className="ml-20 lg:ml-64 p-6">
-                    <Card className="p-12 text-center">
-                        <div className="text-destructive mb-4">
-                            <AlertCircle className="w-16 h-16 mx-auto" />
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">Error Loading Appointments</h3>
-                        <p className="text-muted-foreground mb-4">{error}</p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                        >
-                            Try Again
-                        </button>
-                    </Card>
-                </main>
-            </div>
+            <main className="ml-20 lg:ml-64 p-6">
+                <Card className="p-12 text-center">
+                    <div className="text-destructive mb-4">
+                        <AlertCircle className="w-16 h-16 mx-auto" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">Error Loading Appointments</h3>
+                    <p className="text-muted-foreground mb-4">{error}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                    >
+                        Try Again
+                    </button>
+                </Card>
+            </main>
         );
     }
-
 
     if (!userId || userId === 'null') {
         return (
-            <div className="min-h-screen bg-background">
-                <Sidebar />
-                <main className="ml-20 lg:ml-64 p-6">
-                    <Card className="p-6 text-center">
-                        <p className="text-red-600">Access Denied: User ID not found</p>
-                        <button
-                            onClick={() => router.push('/auth/login')}
-                            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                        >
-                            Go to Login
-                        </button>
-                    </Card>
-                </main>
-            </div>
+            <main className="ml-20 lg:ml-64 p-6">
+                <Card className="p-6 text-center">
+                    <p className="text-red-600">Access Denied: User ID not found</p>
+                    <button
+                        onClick={() => router.push('/auth/login')}
+                        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                    >
+                        Go to Login
+                    </button>
+                </Card>
+            </main>
         );
     }
 
-
     return (
-        <div className="min-h-screen bg-background">
-            <Sidebar />
+        <>
             <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
                 <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                     <div>
@@ -392,6 +379,21 @@ export default function AppointmentsPage() {
                     </div>
                 )}
             </main>
+            <AiChatBot userId={userId} donorContext={donorData} />
+        </>
+    );
+}
+
+export default function AppointmentsPage() {
+    const searchParams = useSearchParams();
+    const userId = searchParams.get('userId') || searchParams.get('id') || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null);
+
+    return (
+        <div className="min-h-screen bg-background">
+            <Sidebar />
+            <DonorContextProvider userId={userId}>
+                <AppointmentsContent />
+            </DonorContextProvider>
         </div>
     );
 }

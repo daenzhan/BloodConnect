@@ -12,6 +12,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation"
 import { Sidebar } from "../components/sidebar"
 import { ProfileCard } from "../components/profile-card"
+import { AiChatBot } from "../components/AiChatBot"
+import { DonorContextProvider, useDonorContext } from "../components/DonorContextProvider"
 
 interface TopDonor {
     rank: number;
@@ -34,7 +36,8 @@ interface CurrentDonorRank {
     nextRankDonations: number;
 }
 
-export default function TopDonorsPage() {
+// Внутренний компонент с контентом страницы
+function TopDonorsContent() {
     const [topDonors, setTopDonors] = useState<TopDonor[]>([])
     const [currentRank, setCurrentRank] = useState<CurrentDonorRank | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -43,6 +46,7 @@ export default function TopDonorsPage() {
     const searchParams = useSearchParams()
     const userIdFromUrl = searchParams.get('userId') || searchParams.get('id')
     const [userId, setUserId] = useState<string | null>(null)
+    const { donorData } = useDonorContext()
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token')
@@ -207,7 +211,7 @@ export default function TopDonorsPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -227,13 +231,13 @@ export default function TopDonorsPage() {
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                 </main>
-            </div>
+            </>
         )
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -257,13 +261,13 @@ export default function TopDonorsPage() {
                         </Button>
                     </Card>
                 </main>
-            </div>
+            </>
         )
     }
 
     if (!userId || userId === 'null') {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -283,14 +287,14 @@ export default function TopDonorsPage() {
                         </Button>
                     </Card>
                 </main>
-            </div>
+            </>
         )
     }
 
     const levelInfo = currentRank ? getLevelInfo(currentRank.donationCount) : null
 
     return (
-        <div className="min-h-screen bg-background">
+        <>
             <Sidebar />
             <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                 {/* Header */}
@@ -362,8 +366,6 @@ export default function TopDonorsPage() {
                                     {levelInfo.currentDonations} / {levelInfo.maxDonations} donations
                                 </span>
                             </div>
-
-
                         </div>
                     </Card>
                 )}
@@ -425,6 +427,7 @@ export default function TopDonorsPage() {
                     </div>
                 )}
             </main>
+            <AiChatBot userId={userId} donorContext={donorData} />
 
             <style jsx>{`
                 @keyframes shimmer {
@@ -439,6 +442,20 @@ export default function TopDonorsPage() {
                     animation: shimmer 2s infinite;
                 }
             `}</style>
+        </>
+    )
+}
+
+// Основной компонент с провайдером
+export default function TopDonorsPage() {
+    const searchParams = useSearchParams()
+    const userId = searchParams.get('userId') || searchParams.get('id') || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null)
+
+    return (
+        <div className="min-h-screen bg-background">
+            <DonorContextProvider userId={userId}>
+                <TopDonorsContent />
+            </DonorContextProvider>
         </div>
     )
 }

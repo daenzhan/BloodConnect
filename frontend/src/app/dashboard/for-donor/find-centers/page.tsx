@@ -17,6 +17,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Sidebar } from "../components/sidebar"
 import { ProfileCard } from "../components/profile-card"
 import { Badge } from "@/components/ui/badge"
+import { AiChatBot } from "../components/AiChatBot"
+import { DonorContextProvider, useDonorContext } from "../components/DonorContextProvider"
 
 interface BloodCenter {
     bloodCenterId: number
@@ -29,7 +31,8 @@ interface BloodCenter {
     longitude?: number
 }
 
-export default function FindCentersPage() {
+// Внутренний компонент с контентом страницы
+function FindCentersContent() {
     const [centers, setCenters] = useState<BloodCenter[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
@@ -38,6 +41,7 @@ export default function FindCentersPage() {
     const searchParams = useSearchParams()
     const userIdFromUrl = searchParams.get('userId') || searchParams.get('id')
     const [userId, setUserId] = useState<string | null>(null)
+    const { donorData } = useDonorContext()
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token')
@@ -150,7 +154,7 @@ export default function FindCentersPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -159,7 +163,6 @@ export default function FindCentersPage() {
                             <p className="text-muted-foreground mt-1">Browse all blood donation centers</p>
                         </div>
                         <div className="flex items-center gap-3">
-
                             {userId && <ProfileCard userId={userId} showBookButton={false} />}
                         </div>
                     </div>
@@ -170,13 +173,13 @@ export default function FindCentersPage() {
                         </div>
                     </div>
                 </main>
-            </div>
+            </>
         )
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -209,13 +212,13 @@ export default function FindCentersPage() {
                         </button>
                     </Card>
                 </main>
-            </div>
+            </>
         )
     }
 
     if (!userId || userId === 'null') {
         return (
-            <div className="min-h-screen bg-background">
+            <>
                 <Sidebar />
                 <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                     <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -243,12 +246,12 @@ export default function FindCentersPage() {
                         </button>
                     </Card>
                 </main>
-            </div>
+            </>
         )
     }
 
     return (
-        <div className="min-h-screen bg-background">
+        <>
             <Sidebar />
             <main className="ml-20 lg:ml-64 p-6 lg:p-8">
                 {/* Fixed Header - всегда на месте */}
@@ -258,7 +261,6 @@ export default function FindCentersPage() {
                         <p className="text-muted-foreground mt-1">Browse all blood donation centers</p>
                     </div>
                     <div className="flex items-center gap-3">
-
                         <ProfileCard userId={userId} showBookButton={false} />
                     </div>
                 </div>
@@ -276,7 +278,6 @@ export default function FindCentersPage() {
                             Found {filteredCenters.length} of {centers.length} centers
                         </p>
                     )}
-
                 </div>
 
                 {/* Content - динамическая область */}
@@ -364,6 +365,21 @@ export default function FindCentersPage() {
                     </>
                 )}
             </main>
+            <AiChatBot userId={userId} donorContext={donorData} />
+        </>
+    )
+}
+
+// Основной компонент с провайдером
+export default function FindCentersPage() {
+    const searchParams = useSearchParams()
+    const userId = searchParams.get('userId') || searchParams.get('id') || (typeof window !== 'undefined' ? localStorage.getItem('userId') : null)
+
+    return (
+        <div className="min-h-screen bg-background">
+            <DonorContextProvider userId={userId}>
+                <FindCentersContent />
+            </DonorContextProvider>
         </div>
     )
 }
