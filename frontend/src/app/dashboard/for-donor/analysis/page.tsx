@@ -113,7 +113,6 @@ function AnalysisContent() {
                 return;
             }
 
-            // Получаем данные донора
             const donorResponse = await fetch(`http://localhost:8080/donor/dashboard/${userId}`, {
                 headers: headers
             });

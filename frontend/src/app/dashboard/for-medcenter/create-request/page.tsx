@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState} from "react"
+import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,10 +13,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {FileText, ArrowLeft, CheckCircle, Loader2, ClipboardList, Plus, Building2} from "lucide-react"
+import { FileText, ArrowLeft, CheckCircle, Loader2, ClipboardList, Plus, Building2, Shield, Clock } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import {ProfileCard} from "@/app/dashboard/for-medcenter/components/profile-card";
+import { ProfileCard } from "@/app/dashboard/for-medcenter/components/profile-card"
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -34,7 +34,6 @@ const rhesusFactors = [
     { value: "NEGATIVE", label: "Negative (-)" }
 ]
 
-// ТЕ ЖЕ КОМПОНЕНТЫ, ЧТО И В РЕЗЕРВАХ
 const componentTypes = [
     { value: "WHOLE_BLOOD", label: "Whole Blood" },
     { value: "RED_BLOOD_CELLS", label: "Red Blood Cells" },
@@ -71,6 +70,8 @@ export default function CreateRequestPage() {
     const [bloodCenters, setBloodCenters] = useState<BloodCenter[]>([])
     const [selectedBloodCenterId, setSelectedBloodCenterId] = useState<string>("")
     const [isLoadingCenters, setIsLoadingCenters] = useState(false)
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(null)
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
     const [formData, setFormData] = useState({
         componentType: "",
@@ -81,10 +82,49 @@ export default function CreateRequestPage() {
         comment: ""
     })
 
-    // Fetch medical center info
+    useEffect(() => {
+        const checkVerification = async () => {
+            if (!userId) {
+                setIsCheckingAuth(false)
+                return
+            }
+
+            try {
+                const headers = getAuthHeaders()
+                if (!headers) {
+                    window.location.href = '/auth/login'
+                    return
+                }
+
+                const response = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                    headers: headers
+                })
+
+                if (response.status === 403) {
+                    setVerificationStatus("PENDING")
+                    setIsCheckingAuth(false)
+                    return
+                }
+
+                if (response.ok) {
+                    const data = await response.json()
+                    setMedCenter(data)
+                    setVerificationStatus(data.verificationStatus || "APPROVED")
+                }
+            } catch (error) {
+                console.error("Error checking verification:", error)
+            } finally {
+                setIsCheckingAuth(false)
+            }
+        }
+
+        checkVerification()
+    }, [userId])
+
+
     useEffect(() => {
         const fetchMedCenter = async () => {
-            if (!userId) return
+            if (!userId || verificationStatus !== "APPROVED") return
             try {
                 const headers = getAuthHeaders()
                 if (!headers) return
@@ -100,11 +140,13 @@ export default function CreateRequestPage() {
             }
         }
         fetchMedCenter()
-    }, [userId])
+    }, [userId, verificationStatus])
 
-    // Fetch all blood centers
+    // Fetch all blood centers (только если APPROVED)
     useEffect(() => {
         const fetchBloodCenters = async () => {
+            if (verificationStatus !== "APPROVED") return
+
             setIsLoadingCenters(true)
             try {
                 const headers = getAuthHeaders()
@@ -127,7 +169,7 @@ export default function CreateRequestPage() {
             }
         }
         fetchBloodCenters()
-    }, [])
+    }, [verificationStatus])
 
     const fetchMedCenterId = async (): Promise<number | null> => {
         try {
@@ -239,6 +281,46 @@ export default function CreateRequestPage() {
         }
     }
 
+    if (verificationStatus === "PENDING") {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
+                <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                    <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <Shield className="w-12 h-12 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-amber-800 mb-3">Account Pending Verification</h2>
+                    <div className="h-1 w-20 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto mb-6"></div>
+                    <p className="text-gray-600 mb-6">
+                        Your medical center account is awaiting approval from the administrator.
+                    </p>
+                    <div className="bg-amber-50 rounded-xl p-4 mb-6 text-left border border-amber-200">
+                        <p className="text-sm text-amber-700">
+                            You cannot create blood requests until your account is verified.
+                            Please wait for admin approval.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => window.location.href = '/dashboard/for-medcenter'}
+                        className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
+                    >
+                        Back to Dashboard
+                    </Button>
+                </Card>
+            </div>
+        )
+    }
+
+    if (isCheckingAuth) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        )
+    }
+
     if (isSuccess) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -251,7 +333,7 @@ export default function CreateRequestPage() {
                         Your blood request has been submitted successfully.
                     </p>
                     <Link href={`/dashboard/for-medcenter/my-requests?userId=${userId}`}>
-                        <Button className="bg-red-600 hover:bg-red-700 text-white">
+                        <Button className="bg-primary hover:bg-primary/90 text-white">
                             View my requests
                         </Button>
                     </Link>
@@ -286,7 +368,6 @@ export default function CreateRequestPage() {
                 <Card className="p-4 md:p-6 rounded-2xl border border-border">
                     <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
 
-                        {/* Blood Center Selection - NEW */}
                         <div className="space-y-2">
                             <Label htmlFor="bloodCenter" className="text-sm font-medium">
                                 Blood Center <span className="text-red-500">*</span>
@@ -318,7 +399,6 @@ export default function CreateRequestPage() {
                             )}
                         </div>
 
-                        {/* Component Type */}
                         <div className="space-y-2">
                             <Label htmlFor="componentType" className="text-sm font-medium">
                                 Component type <span className="text-red-500">*</span>
@@ -340,14 +420,14 @@ export default function CreateRequestPage() {
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
-                                {formData.componentType === "PLASMA" && "⚠️ Plasma requires 90 days quarantine before use"}
-                                {formData.componentType === "PLATELETS" && "📅 Platelets expire in 5 days"}
-                                {formData.componentType === "WHOLE_BLOOD" && "📅 Whole blood expires in 35 days"}
-                                {formData.componentType === "RED_BLOOD_CELLS" && "📅 Red blood cells expire in 42 days"}
+                                {formData.componentType === "PLASMA" && "️ Plasma requires 90 days quarantine before use"}
+                                {formData.componentType === "PLATELETS" && " Platelets expire in 5 days"}
+                                {formData.componentType === "WHOLE_BLOOD" && " Whole blood expires in 35 days"}
+                                {formData.componentType === "RED_BLOOD_CELLS" && " Red blood cells expire in 42 days"}
                             </p>
                         </div>
 
-                        {/* Blood Group and Rhesus Factor */}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="bloodGroup" className="text-sm font-medium">
@@ -394,7 +474,7 @@ export default function CreateRequestPage() {
                             </div>
                         </div>
 
-                        {/* Volume */}
+
                         <div className="space-y-2">
                             <Label htmlFor="volume" className="text-sm font-medium">
                                 Volume <span className="text-red-500">*</span>
@@ -416,11 +496,10 @@ export default function CreateRequestPage() {
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
-                                💡 Standard blood donation is 450 ml
+                                 Standard blood donation is 450 ml
                             </p>
                         </div>
 
-                        {/* Deadline */}
                         <div className="space-y-2">
                             <Label htmlFor="deadline" className="text-sm font-medium">
                                 Deadline <span className="text-gray-400 text-xs">(Optional)</span>
@@ -437,7 +516,6 @@ export default function CreateRequestPage() {
                             </p>
                         </div>
 
-                        {/* Comment */}
                         <div className="space-y-2">
                             <Label htmlFor="comment" className="text-sm font-medium">
                                 Additional comments <span className="text-gray-400 text-xs">(Optional)</span>

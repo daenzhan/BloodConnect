@@ -266,7 +266,7 @@ public class AdminService {
 
         if (userEmail != null) {
             try {
-                emailVerificationService.sendVerificationStatusEmail(userEmail, type, status, rejectionReason);
+                emailVerificationService.sendVerificationStatusEmail(userEmail, type, status, rejectionReason, centerName);
                 System.out.println("Verification email sent to: " + userEmail);
             } catch (Exception e) {
                 System.err.println("Failed to send verification email: " + e.getMessage());

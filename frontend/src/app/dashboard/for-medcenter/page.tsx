@@ -185,7 +185,6 @@ export default function MedCenterDashboard() {
         inProgressRequests: requests.filter(r => r.status === "IN_PROGRESS").length
     }
 
-    // Компонент для статуса PENDING (ожидание верификации)
     const renderPendingVerification = () => (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
             <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
@@ -253,7 +252,6 @@ export default function MedCenterDashboard() {
         </div>
     )
 
-    // Компонент для статуса REJECTED (отклонено)
     const renderRejectedVerification = () => (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100/30 p-4">
             <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
@@ -313,12 +311,10 @@ export default function MedCenterDashboard() {
         </div>
     )
 
-    // Показываем статус PENDING
     if (verificationStatus === "PENDING") {
         return renderPendingVerification()
     }
 
-    // Показываем статус REJECTED
     if (verificationStatus === "REJECTED") {
         return renderRejectedVerification()
     }
@@ -386,7 +382,7 @@ export default function MedCenterDashboard() {
         )
     }
 
-    // Если APPROVED - показываем дашборд
+
     return (
         <div className="p-6 lg:p-8">
             <div className="space-y-6">
@@ -404,21 +400,6 @@ export default function MedCenterDashboard() {
                     />
                 </header>
 
-                {/* Баннер успешной верификации (если только что одобрено) */}
-                {verificationStatus === "APPROVED" && (
-                    <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top duration-500">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                                <CheckCircle className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                                <p className="font-semibold text-green-800">Account Verified!</p>
-                                <p className="text-sm text-green-700">Your medical center is now fully verified. You can create blood requests.</p>
-                            </div>
-                        </div>
-                        <FileCheck className="w-8 h-8 text-green-500 opacity-50" />
-                    </div>
-                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <WelcomeCard centerName={medCenter.name} />

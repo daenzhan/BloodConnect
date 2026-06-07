@@ -160,37 +160,92 @@ public class EmailVerificationService {
     }
 
 
-    public void sendVerificationStatusEmail(String email, String type, String status, String rejectionReason) {
+    public void sendVerificationStatusEmail(String email, String type, String status, String rejectionReason, String centerName) {
         log.info("Sending verification status email to: {} for type: {} status: {}", email, type, status);
 
-        String subject = status.equals("APPROVED") ?
-                " Your " + type + " account has been approved!" :
-                " Your " + type + " account verification status";
+        String centerType = type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center";
+        String displayName = centerName != null && !centerName.isEmpty() ? centerName : centerType;
 
+        String subject;
         String message;
+
         if (status.equals("APPROVED")) {
+            subject = " Congratulations! Your " + centerType + " has been APPROVED!";
+
             message = String.format(
-                    "Dear %s,\n\n" +
-                            "Congratulations! Your %s account has been successfully verified.\n\n" +
-                            "Thank you for joining BloodConnect and helping save lives!\n\n" +
-                            "Best regards,\n" +
-                            "The BloodConnect Team",
-                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
-                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center"
+                    """
+                    Dear %s, VERIFICATION APPROVED 
+                
+                    We are pleased to inform you that your registration has been 
+                    successfully reviewed and APPROVED!
+                    
+                    Center Name: %s                     
+                    Type: %s                           
+                    Status:  APPROVED              
+                   
+                    
+                     What you can do now:
+                    Login to your BloodConnect account
+                    Create and manage blood requests
+                    Access all features of the platform
+                    Start saving lives in your community
+                    
+                     Next Steps:
+                    1. Log in to your account
+                    2. Complete your center profile
+                    3. Start accepting blood requests
+                    4. Connect with donors
+                    
+                    Thank you for joining BloodConnect and helping save lives!
+                    
+                    Best regards,
+                    The BloodConnect Team
+                    💙 Saving lives, one donation at a time
+                    """,
+                    displayName, displayName, centerType
             );
         } else {
+            subject = " Important: Your " + centerType + " Verification Status";
+
             message = String.format(
-                    "Dear %s,\n\n" +
-                            "We regret to inform you that your %s account could not be verified.\n\n" +
-                            "Reason for rejection: %s\n\n" +
-                            "Please contact our support team for more information or to appeal this decision.\n\n" +
-                            "Best regards,\n" +
-                            "The BloodConnect Team",
-                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
-                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
-                    rejectionReason != null ? rejectionReason : "No specific reason provided"
+                    """
+                    Dear %s,VERIFICATION STATUS UPDATE 
+                    
+                    
+                    We regret to inform you that your registration could not be 
+                    verified at this time.
+              
+                     Center Name: %s                     
+                     Type: %s                           
+                     Status:  REJECTED                 
+              
+                     Reason for Rejection:
+                    
+                    %s
+                    
+                     What you can do:
+                    • Review the rejection reason above
+                    • Correct any issues with your documents
+                    • Contact our support team for assistance
+                    • Submit a new registration with updated information
+                    
+                     Need Help?
+                    Our support team is here to help you resolve any issues.
+                    Please contact us at: support@bloodconnect.com
+                    
+                    We look forward to having you join our community of life-savers!
+         
+                    Best regards,
+                    The BloodConnect Team
+                    💙 Saving lives, one donation at a time
+                    """,
+                    displayName,
+                    displayName,
+                    centerType,
+                    rejectionReason != null && !rejectionReason.isEmpty() ? rejectionReason : "No specific reason provided. Please contact support for details."
             );
         }
+
         SimpleMailMessage mailMessage = new SimpleMailMessage();
         mailMessage.setTo(email);
         mailMessage.setSubject(subject);
