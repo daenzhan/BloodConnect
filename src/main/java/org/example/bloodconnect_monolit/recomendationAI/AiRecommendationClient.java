@@ -16,8 +16,8 @@ public class AiRecommendationClient {
 
     public AiRecommendationClient(@Value("${ai.recommendation.base-url:http://localhost:8000}") String baseUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(10000);
+        factory.setConnectTimeout(10000);
+        factory.setReadTimeout(300000);
         this.restTemplate = new RestTemplate(factory);
         this.baseUrl = baseUrl;
     }

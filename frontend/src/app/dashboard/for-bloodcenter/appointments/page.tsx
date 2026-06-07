@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Calendar, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical, Database, Plus, Trash2, Eye } from "lucide-react";
 
-// ============== ХЕЛПЕРЫ ==============
+//  ХЕЛПЕРЫ
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -63,7 +63,7 @@ const formatBloodType = (bloodGroup?: string, rhesusFactor?: string): string => 
     return `${bloodGroup}${rh}`;
 };
 
-// ============== КОНСТАНТЫ ==============
+//  КОНСТАНТЫ
 const statusColors: Record<string, string> = {
     SCHEDULED: "bg-secondary text-secondary-foreground",
     IN_PROGRESS: "bg-accent text-accent-foreground",
@@ -116,7 +116,7 @@ const getQuarantineDays = (componentType: string): number | null => {
     return null;
 };
 
-// ============== ИНТЕРФЕЙСЫ ==============
+//ИНТЕРФЕЙСЫ
 interface Appointment {
     appointmentId: number;
     appointmentDate: string;

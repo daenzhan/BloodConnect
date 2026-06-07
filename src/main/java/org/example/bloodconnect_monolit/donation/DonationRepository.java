@@ -1,4 +1,3 @@
-// org.example.bloodconnect_monolit.donation.DonationRepository
 package org.example.bloodconnect_monolit.donation;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +19,5 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
     @Query("SELECT d FROM Donation d WHERE d.donor.donorId = :donorId ORDER BY d.donationDate ASC")
     List<Donation> findByDonor_DonorIdOrderByDonationDateAsc(@Param("donorId") Long donorId);
     long countByDonationDateBetween(LocalDateTime start, LocalDateTime end);
+    
 }

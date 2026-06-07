@@ -84,7 +84,6 @@ const getReadinessColor = (level: string) => {
     }
 };
 
-// Внутренний компонент с контентом страницы
 function AnalysisContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -141,8 +140,7 @@ function AnalysisContent() {
 
             setDonorId(donorIdValue);
 
-            // Получаем последний анализ
-            const analysisResponse = await fetch(`http://localhost:8080/analyses/donor/${donorIdValue}/latest`, {
+            const analysisResponse = await fetch(`http://localhost:8080/analyses/donor/by-user/${userId}/latest`, {
                 headers: headers
             });
 
@@ -157,7 +155,6 @@ function AnalysisContent() {
             const data = await analysisResponse.json();
             setAnalysis(data);
 
-            // Загружаем AI рекомендации
             fetchAiRecommendation(donorIdValue);
 
         } catch (err) {
@@ -172,7 +169,7 @@ function AnalysisContent() {
             const headers = getAuthHeaders();
             if (!headers) return;
 
-            const response = await fetch(`http://localhost:8080/analyses/donor/${donorIdValue}/ai-recommendation`, {
+            const response = await fetch(`http://localhost:8080/analyses/donor/by-user/${userId}/ai-recommendation`, {
                 headers: headers
             });
 
@@ -213,10 +210,6 @@ function AnalysisContent() {
                             <p className="text-muted-foreground mt-1">Review your blood test results</p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Button onClick={handleBackToDashboard} variant="outline">
-                                <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to Dashboard
-                            </Button>
                             {userId && <ProfileCard userId={userId} showBookButton={false} />}
                         </div>
                     </div>
@@ -242,10 +235,6 @@ function AnalysisContent() {
                             <p className="text-muted-foreground mt-1">Review your blood test results</p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Button onClick={handleBackToDashboard} variant="outline">
-                                <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to Dashboard
-                            </Button>
                             {userId && <ProfileCard userId={userId} showBookButton={false} />}
                         </div>
                     </div>
@@ -255,9 +244,6 @@ function AnalysisContent() {
                         <p className="text-muted-foreground mb-4">
                             {error || "Your blood analysis results will appear here after your next donation."}
                         </p>
-                        <Button onClick={handleBackToDashboard}>
-                            Back to Dashboard
-                        </Button>
                     </Card>
                 </main>
             </>

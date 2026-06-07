@@ -50,6 +50,29 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+
+    @GetMapping("/licenses")
+    public ResponseEntity<List<LicenseVerificationDTO>> getLicenses(@RequestParam(required = false) String status) {
+        if ("PENDING".equals(status)) {
+            return ResponseEntity.ok(adminService.getPendingLicenses());
+        } else if ("APPROVED".equals(status)) {
+            return ResponseEntity.ok(adminService.getApprovedLicenses());
+        } else if ("REJECTED".equals(status)) {
+            return ResponseEntity.ok(adminService.getRejectedLicenses());
+        }
+        return ResponseEntity.ok(adminService.getAllLicenses());
+    }
+
+    @GetMapping("/licenses/blood-centers")
+    public ResponseEntity<List<LicenseVerificationDTO>> getBloodCenterLicenses() {
+        return ResponseEntity.ok(adminService.getLicensesByType("BLOOD_CENTER"));
+    }
+
+    @GetMapping("/licenses/medical-centers")
+    public ResponseEntity<List<LicenseVerificationDTO>> getMedicalCenterLicenses() {
+        return ResponseEntity.ok(adminService.getLicensesByType("MEDICAL_CENTER"));
+    }
+
     @GetMapping("/licenses/pending")
     public ResponseEntity<List<LicenseVerificationDTO>> getPendingLicenses() {
         return ResponseEntity.ok(adminService.getPendingLicenses());

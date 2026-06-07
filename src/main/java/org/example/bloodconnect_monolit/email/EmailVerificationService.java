@@ -158,4 +158,51 @@ public class EmailVerificationService {
 
         mailSender.send(message);
     }
+
+
+    public void sendVerificationStatusEmail(String email, String type, String status, String rejectionReason) {
+        log.info("Sending verification status email to: {} for type: {} status: {}", email, type, status);
+
+        String subject = status.equals("APPROVED") ?
+                " Your " + type + " account has been approved!" :
+                " Your " + type + " account verification status";
+
+        String message;
+        if (status.equals("APPROVED")) {
+            message = String.format(
+                    "Dear %s,\n\n" +
+                            "Congratulations! Your %s account has been successfully verified.\n\n" +
+                            "Thank you for joining BloodConnect and helping save lives!\n\n" +
+                            "Best regards,\n" +
+                            "The BloodConnect Team",
+                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
+                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center"
+            );
+        } else {
+            message = String.format(
+                    "Dear %s,\n\n" +
+                            "We regret to inform you that your %s account could not be verified.\n\n" +
+                            "Reason for rejection: %s\n\n" +
+                            "Please contact our support team for more information or to appeal this decision.\n\n" +
+                            "Best regards,\n" +
+                            "The BloodConnect Team",
+                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
+                    type.equals("BLOOD_CENTER") ? "Blood Center" : "Medical Center",
+                    rejectionReason != null ? rejectionReason : "No specific reason provided"
+            );
+        }
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setTo(email);
+        mailMessage.setSubject(subject);
+        mailMessage.setText(message);
+        mailMessage.setFrom("noreply@bloodconnect.com");
+
+        try {
+            mailSender.send(mailMessage);
+            log.info("Verification status email sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send verification status email to {}: {}", email, e.getMessage());
+            throw new RuntimeException("Failed to send verification email. Please try again.");
+        }
+    }
 }

@@ -71,17 +71,17 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // === ПУБЛИЧНЫЕ ЭНДПОИНТЫ ===
+                        // ПУБЛИЧНЫЕ ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/home", "/").permitAll()
 
-                        // === DONOR ЭНДПОИНТЫ ===
+                        // DONOR ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.GET, "/donor/dashboard/**").hasRole("DONOR")
                         .requestMatchers(HttpMethod.GET, "/donor/top-donors").permitAll()
                         .requestMatchers(HttpMethod.GET, "/donor/current-donor-rank/**").hasRole("DONOR")
 
-                        // === BLOOD CENTER ЭНДПОИНТЫ ===
+                        // BLOOD CENTER ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.GET, "/blood-centers").permitAll()
                         .requestMatchers(HttpMethod.GET, "/blood-centers/{bloodCenterId}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/blood-centers/by-user/**").hasRole("BLOOD_CENTER")
@@ -91,13 +91,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/blood-centers/{bloodCenterId}/reserves/initialize").hasRole("BLOOD_CENTER")
                         .requestMatchers(HttpMethod.GET, "/blood-centers/{bloodCenterId}/statistics").hasRole("BLOOD_CENTER")
 
-                        // === MEDICAL CENTER ЭНДПОИНТЫ ===
+                        // MEDICAL CENTER ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.GET, "/medcenter/user/**").hasRole("MEDICAL_CENTER")
                         .requestMatchers(HttpMethod.PUT, "/medcenter/update/**").hasRole("MEDICAL_CENTER")
                         .requestMatchers(HttpMethod.POST, "/medcenter/create").hasRole("MEDICAL_CENTER")
                         .requestMatchers(HttpMethod.GET, "/medcenter/{id}").hasRole("MEDICAL_CENTER")
 
-                        // === APPOINTMENT ЭНДПОИНТЫ ===
+                        // APPOINTMENT ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.POST, "/appointments/create").hasRole("DONOR")
                         .requestMatchers(HttpMethod.PUT, "/appointments/{appointmentId}/start").hasRole("BLOOD_CENTER")
                         .requestMatchers(HttpMethod.PUT, "/appointments/{appointmentId}/complete-donation").hasRole("BLOOD_CENTER")
@@ -134,7 +134,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/analyses/{analysisId}").hasRole("BLOOD_CENTER")
                         .requestMatchers(HttpMethod.GET, "/analyses/bloodcenter/{bloodCenterId}/stats").hasRole("BLOOD_CENTER")
 
-                        // === ADMIN ===
+                        //  ADMIN
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/admin/stats").hasRole("ADMIN")
@@ -146,7 +146,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/admin/create-admin").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/files/upload/**").hasAnyRole("BLOOD_CENTER", "MEDICAL_CENTER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/files/download/**").permitAll()
-                        // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

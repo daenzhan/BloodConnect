@@ -188,7 +188,6 @@ public class AnalysisController {
         }
     }
 
-    // Получение всех анализов для blood center
     @GetMapping("/bloodcenter/{bloodCenterId}")
     public ResponseEntity<?> getAnalysesByBloodCenter(@PathVariable Long bloodCenterId) {
         try {
@@ -199,21 +198,20 @@ public class AnalysisController {
         }
     }
 
-    // эндпоинт для получения AI-рекомендации
-    @GetMapping("/donor/{donorId}/ai-recommendation")
-    public ResponseEntity<?> getAiRecommendation(@PathVariable Long donorId) {
+    @GetMapping("/donor/by-user/{userId}/ai-recommendation")
+    public ResponseEntity<?> getAiRecommendationByUserId(@PathVariable Long userId) {
         try {
-            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            Optional<Donor> donorOpt = donorRepository.findByUser_UserId(userId);
             if (donorOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(404).body(Map.of(
+                        "error", "Donor not found for user ID: " + userId
+                ));
             }
 
             Donor donor = donorOpt.get();
+            Long donorId = donor.getDonorId();
 
-            // Получаем последний анализ донора
             Optional<Analysis> lastAnalysis = analysisRepository.findLatestByDonorId(donorId);
-
-            // Создаем запрос для AI
             AiRecommendationRequest request = new AiRecommendationRequest();
             request.setAge(calculateAge(donor.getBirthDate()));
             request.setGender(donor.getGender().equals("MALE") ? 1 : 0);
@@ -224,7 +222,7 @@ public class AnalysisController {
             if (lastAnalysis.isPresent()) {
                 Analysis analysis = lastAnalysis.get();
                 request.setHemoglobin(analysis.getHemoglobin() != null ? analysis.getHemoglobin() : 0);
-                request.setFerritin(null); // если есть поле ферритина
+                request.setFerritin(null);
             } else {
                 request.setHemoglobin(0);
                 request.setFerritin(null);
@@ -234,11 +232,7 @@ public class AnalysisController {
             request.setAvgIntervalDays(calculateAvgInterval(donor));
             request.setLowHgbHistory(hasLowHemoglobinHistory(donorId) ? 1 : 0);
 
-            // Получаем рекомендацию от AI
             AiRecommendationResponse aiResponse = aiRecommendationClient.getRecommendation(request);
-
-            // Сохраняем рекомендацию в БД (опционально)
-            // saveRecommendation(donorId, aiResponse);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", aiResponse.isSuccess());
@@ -250,9 +244,87 @@ public class AnalysisController {
             response.put("confidence", aiResponse.getConfidence());
             response.put("bmi", calculateBMI(donor.getWeight(), donor.getHeight()));
             response.put("bmiCategory", aiResponse.getBmiCategory());
+            response.put("donorId", donorId);
+            response.put("userId", userId);
 
             return ResponseEntity.ok(response);
 
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/donor/by-user/{userId}/latest")
+    public ResponseEntity<?> getLatestAnalysisByUserId(@PathVariable Long userId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findByUser_UserId(userId);
+            if (donorOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                        "error", "Donor not found for user ID: " + userId
+                ));
+            }
+
+            Long donorId = donorOpt.get().getDonorId();
+
+            Optional<Analysis> analysisOpt = analysisRepository.findLatestByDonorId(donorId);
+            if (analysisOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                        "exists", false,
+                        "message", "No analysis found for this donor"
+                ));
+            }
+
+            Analysis analysis = analysisOpt.get();
+            Map<String, Object> response = new HashMap<>();
+            response.put("analysisId", analysis.getAnalysisId());
+            response.put("status", analysis.getStatus());
+            response.put("hiv", analysis.getHiv());
+            response.put("brucellosis", analysis.getBrucellosis());
+            response.put("hepatitisB", analysis.getHepatitisB());
+            response.put("hepatitisC", analysis.getHepatitisC());
+            response.put("syphilis", analysis.getSyphilis());
+            response.put("altLevel", analysis.getAltLevel());
+            response.put("bloodGroup", analysis.getBloodGroup());
+            response.put("rhesusFactor", analysis.getRhesusFactor());
+            response.put("hemoglobin", analysis.getHemoglobin());
+            response.put("technicianNotes", analysis.getTechnicianNotes());
+            response.put("analysisDate", analysis.getAnalysisDate());
+            response.put("donationId", analysis.getDonation().getDonationId());
+            response.put("bloodCenterId", analysis.getBloodCenter().getBloodCenterId());
+            response.put("isComplete", analysis.isComplete());
+            response.put("isDonorEligible", analysis.isComplete() ? analysis.isDonorEligible() : false);
+            response.put("donorId", donorId);
+            response.put("userId", userId);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @Deprecated
+    @GetMapping("/donor/{donorId}/ai-recommendation")
+    public ResponseEntity<?> getAiRecommendation(@PathVariable Long donorId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            if (donorOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return getAiRecommendationByUserId(donorOpt.get().getUser().getUserId());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @Deprecated
+    @GetMapping("/donor/{donorId}/latest")
+    public ResponseEntity<?> getLatestAnalysisByDonorId(@PathVariable Long donorId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            if (donorOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return getLatestAnalysisByUserId(donorOpt.get().getUser().getUserId());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
@@ -269,6 +341,7 @@ public class AnalysisController {
 
     private Integer calculateAvgInterval(Donor donor) {
         try {
+            // Добавьте этот метод в DonationRepository
             List<Donation> donations = donationRepository.findByDonor_DonorIdOrderByDonationDateAsc(donor.getDonorId());
             if (donations == null || donations.size() < 2) {
                 return null;
@@ -310,33 +383,10 @@ public class AnalysisController {
 
             double threshold = "MALE".equals(donor.getGender()) ? 130.0 : 120.0;
 
-            List<Analysis> analyses = analysisRepository.findAllByDonorIdOrderByDateAsc(donorId);
-
-            if (analyses == null || analyses.isEmpty()) {
-                return false;
-            }
-            for (Analysis analysis : analyses) {
-                if (analysis.getHemoglobin() != null && analysis.getHemoglobin() < threshold) {
-                    return true;
-                }
-            }
-            return false;
+            return analysisRepository.hasLowHemoglobinInHistory(donorId, threshold);
         } catch (Exception e) {
             System.err.println("Error checking low hemoglobin history: " + e.getMessage());
             return false;
-        }
-    }
-
-    @GetMapping("/donor/{donorId}/latest")
-    public ResponseEntity<?> getLatestAnalysisByDonorId(@PathVariable Long donorId) {
-        try {
-            Optional<Analysis> analysisOpt = analysisRepository.findLatestByDonorId(donorId);
-            if (analysisOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok(analysisOpt.get());
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 }

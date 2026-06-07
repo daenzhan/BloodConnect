@@ -8,6 +8,7 @@ import org.example.bloodconnect_monolit.bloodCenter.BloodCenterRepository;
 import org.example.bloodconnect_monolit.bloodRequest.BloodRequest;
 import org.example.bloodconnect_monolit.bloodRequest.BloodRequestRepository;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
+import org.example.bloodconnect_monolit.email.EmailVerificationService;
 import org.example.bloodconnect_monolit.medCenter.MedCenter;
 import org.example.bloodconnect_monolit.medCenter.MedCenterRepository;
 import org.example.bloodconnect_monolit.user.User;
@@ -34,6 +35,7 @@ public class AdminService {
     private final BloodRequestRepository bloodRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminRepository adminRepository;
+    private final EmailVerificationService emailVerificationService;
 
     public AdminStatsDTO getStats() {
         AdminStatsDTO stats = new AdminStatsDTO();
@@ -115,26 +117,6 @@ public class AdminService {
         userRepository.save(user);
     }
 
-    @Transactional
-    public void verifyLicense(String type, Long id, String status, String rejectionReason, Long adminId) {
-        if ("BLOOD_CENTER".equals(type)) {
-            BloodCenter center = bloodCenterRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Blood center not found"));
-            center.setVerificationStatus(status);
-            center.setRejectionReason(rejectionReason);
-            center.setVerifiedBy(adminId);
-            center.setVerifiedAt(LocalDateTime.now());
-            bloodCenterRepository.save(center);
-        } else if ("MEDICAL_CENTER".equals(type)) {
-            MedCenter center = medCenterRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Medical center not found"));
-            center.setVerificationStatus(status);
-            center.setRejectionReason(rejectionReason);
-            center.setVerifiedBy(adminId);
-            center.setVerifiedAt(LocalDateTime.now());
-            medCenterRepository.save(center);
-        }
-    }
 
     public List<LicenseVerificationDTO> getPendingLicenses() {
         List<LicenseVerificationDTO> result = new ArrayList<>();
@@ -195,5 +177,102 @@ public class AdminService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setRole(newRole);
         userRepository.save(user);
+    }
+
+    public List<LicenseVerificationDTO> getAllLicenses() {
+        List<LicenseVerificationDTO> result = new ArrayList<>();
+        List<BloodCenter> allBloodCenters = bloodCenterRepository.findAll();
+        for (BloodCenter bc : allBloodCenters) {
+            LicenseVerificationDTO dto = new LicenseVerificationDTO();
+            dto.setId(bc.getBloodCenterId());
+            dto.setType("BLOOD_CENTER");
+            dto.setName(bc.getName());
+            dto.setLocation(bc.getLocation());
+            dto.setDirectorFullName(bc.getDirectorFullName());
+            dto.setLicenseFile(bc.getLicenseFile());
+            dto.setVerificationStatus(bc.getVerificationStatus());
+            dto.setRejectionReason(bc.getRejectionReason());
+            dto.setCreatedAt(bc.getCreatedAt());
+            dto.setUserId(bc.getUser().getUserId());
+            dto.setUserEmail(bc.getUser().getEmail());
+            result.add(dto);
+        }
+
+        List<MedCenter> allMedCenters = medCenterRepository.findAll();
+        for (MedCenter mc : allMedCenters) {
+            LicenseVerificationDTO dto = new LicenseVerificationDTO();
+            dto.setId(mc.getMedCenterId());
+            dto.setType("MEDICAL_CENTER");
+            dto.setName(mc.getName());
+            dto.setLocation(mc.getLocation());
+            dto.setDirectorFullName(mc.getDirectorFullName());
+            dto.setLicenseFile(mc.getLicenseFile());
+            dto.setVerificationStatus(mc.getVerificationStatus());
+            dto.setRejectionReason(mc.getRejectionReason());
+            dto.setCreatedAt(mc.getCreatedAt());
+            dto.setUserId(mc.getUser().getUserId());
+            dto.setUserEmail(mc.getUser().getEmail());
+            result.add(dto);
+        }
+        return result;
+    }
+
+    public List<LicenseVerificationDTO> getApprovedLicenses() {
+        return getAllLicenses().stream()
+                .filter(l -> "APPROVED".equals(l.getVerificationStatus()))
+                .collect(Collectors.toList());
+    }
+
+    public List<LicenseVerificationDTO> getRejectedLicenses() {
+        return getAllLicenses().stream()
+                .filter(l -> "REJECTED".equals(l.getVerificationStatus()))
+                .collect(Collectors.toList());
+    }
+
+    public List<LicenseVerificationDTO> getLicensesByType(String type) {
+        return getAllLicenses().stream()
+                .filter(l -> type.equals(l.getType()))
+                .collect(Collectors.toList());
+    }
+
+
+
+    @Transactional
+    public void verifyLicense(String type, Long id, String status, String rejectionReason, Long adminId) {
+        String userEmail = null;
+        String centerName = null;
+
+        if ("BLOOD_CENTER".equals(type)) {
+            BloodCenter center = bloodCenterRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Blood center not found"));
+            center.setVerificationStatus(status);
+            center.setRejectionReason(rejectionReason);
+            center.setVerifiedBy(adminId);
+            center.setVerifiedAt(LocalDateTime.now());
+            bloodCenterRepository.save(center);
+            userEmail = center.getUser().getEmail();
+            centerName = center.getName();
+        } else if ("MEDICAL_CENTER".equals(type)) {
+            MedCenter center = medCenterRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Medical center not found"));
+            center.setVerificationStatus(status);
+            center.setRejectionReason(rejectionReason);
+            center.setVerifiedBy(adminId);
+            center.setVerifiedAt(LocalDateTime.now());
+            medCenterRepository.save(center);
+            userEmail = center.getUser().getEmail();
+            centerName = center.getName();
+        }
+
+        if (userEmail != null) {
+            try {
+                emailVerificationService.sendVerificationStatusEmail(userEmail, type, status, rejectionReason);
+                System.out.println("Verification email sent to: " + userEmail);
+            } catch (Exception e) {
+                System.err.println("Failed to send verification email: " + e.getMessage());
+            }
+        }
+
+        System.out.println("License verified: " + type + " ID: " + id + " Status: " + status);
     }
 }

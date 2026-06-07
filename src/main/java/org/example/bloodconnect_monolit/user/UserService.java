@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
@@ -158,6 +160,10 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
+    public Optional<User> getUserByIdOptional(Long id) {
+        return userRepository.findById(id);
+    }
+
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
@@ -185,4 +191,5 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
         emailVerificationRepository.findByEmail(email).ifPresent(emailVerificationRepository::delete);
     }
+
 }

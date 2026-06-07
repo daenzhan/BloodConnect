@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Building2, MapPin, FileText, Save, Edit2, Calendar, ArrowLeft, Loader2 } from "lucide-react"
+import { User, Building2, MapPin, FileText, Save, Edit2, Calendar, ArrowLeft, Loader2, Shield, CheckCircle, XCircle, Clock } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { ProfileCard } from "@/app/dashboard/for-medcenter/components/profile-card"
@@ -27,6 +27,8 @@ interface MedCenterProfile {
     directorFullName?: string
     specialization?: string
     createdAt?: string
+    verificationStatus?: string  // ДОБАВЛЕНО
+    rejectionReason?: string      // ДОБАВЛЕНО
 }
 
 export default function ProfilePage() {
@@ -84,6 +86,9 @@ export default function ProfilePage() {
                     setProfile(data)
                     setEditedProfile(data)
                     setError(null)
+
+                    // ДОБАВЛЕНО: также получаем статус верификации
+                    await fetchVerificationStatus(data.medCenterId)
                 } else if (response.status === 404) {
                     setError(`Medical center for user ID ${userId} not found`)
                 } else {
@@ -101,6 +106,29 @@ export default function ProfilePage() {
             fetchProfile()
         }
     }, [userId])
+
+    // ДОБАВЛЕНА ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ СТАТУСА ВЕРИФИКАЦИИ
+    const fetchVerificationStatus = async (medCenterId: number) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const response = await fetch(`http://localhost:8080/medcenter/${medCenterId}`, {
+                headers: headers
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setProfile(prev => prev ? {
+                    ...prev,
+                    verificationStatus: data.verificationStatus,
+                    rejectionReason: data.rejectionReason
+                } : prev);
+            }
+        } catch (error) {
+            console.error("Error fetching verification status:", error);
+        }
+    };
 
     const handleSave = async () => {
         if (!profile) return
@@ -169,6 +197,62 @@ export default function ProfilePage() {
         }
     };
 
+    // ДОБАВЛЕНА ФУНКЦИЯ ДЛЯ ОТОБРАЖЕНИЯ СТАТУСА
+    const renderVerificationStatus = () => {
+        const status = profile?.verificationStatus;
+
+        if (!status) return null;
+
+        if (status === 'APPROVED') {
+            return (
+                <div className="p-3 rounded-xl bg-green-50 border border-green-200">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-green-700">✓ Approved</span>
+                    </div>
+                    <p className="text-sm text-green-600 mt-1">
+                        Your account has been verified. You have full access to all features.
+                    </p>
+                </div>
+            );
+        }
+
+        if (status === 'REJECTED') {
+            return (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200">
+                    <div className="flex items-center gap-2">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        <span className="font-medium text-red-700">✗ Rejected</span>
+                    </div>
+                    {profile?.rejectionReason && (
+                        <p className="text-sm text-red-600 mt-1">
+                            Reason: {profile.rejectionReason}
+                        </p>
+                    )}
+                    <p className="text-sm text-red-600 mt-1">
+                        Please contact support for more information.
+                    </p>
+                </div>
+            );
+        }
+
+        // PENDING or default
+        return (
+            <div className="p-3 rounded-xl bg-yellow-50 border border-yellow-200">
+                <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-700">⏳ Pending Verification</span>
+                </div>
+                <p className="text-sm text-yellow-600 mt-1">
+                    Your account is awaiting admin approval. You will receive an email once your license is verified.
+                </p>
+                <p className="text-xs text-yellow-500 mt-2">
+                    While pending, you can view but not create blood requests.
+                </p>
+            </div>
+        );
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -212,6 +296,11 @@ export default function ProfilePage() {
                         location={profile.location}
                         userId={userId || ""}
                     />
+                </div>
+
+                {/* ДОБАВЛЕН БЛОК СТАТУСА ВЕРИФИКАЦИИ */}
+                <div className="mb-6">
+                    {renderVerificationStatus()}
                 </div>
 
                 <div className="flex justify-end mb-6">
@@ -315,10 +404,7 @@ export default function ProfilePage() {
                                 </div>
                             )}
                         </div>
-                    </div>
 
-
-                    <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="directorFullName">Director's Full Name</Label>
                             {isEditing ? (

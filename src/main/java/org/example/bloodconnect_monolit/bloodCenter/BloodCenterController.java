@@ -253,4 +253,21 @@ public class BloodCenterController {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/{bloodCenterId}/verification-status")
+    public ResponseEntity<?> getVerificationStatus(@PathVariable Long bloodCenterId) {
+        Optional<BloodCenter> centerOpt = bloodCenterRepository.findById(bloodCenterId);
+        if (centerOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        BloodCenter center = centerOpt.get();
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", center.getVerificationStatus());
+        response.put("isApproved", "APPROVED".equals(center.getVerificationStatus()));
+        response.put("rejectionReason", center.getRejectionReason());
+        response.put("verifiedAt", center.getVerifiedAt());
+
+        return ResponseEntity.ok(response);
+    }
 }

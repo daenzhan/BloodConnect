@@ -51,7 +51,7 @@ public class BloodCenter {
     private Double longitude;
 
     @Column(name = "verification_status")
-    private String verificationStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+    private String verificationStatus = "PENDING";
 
     @Column(name = "rejection_reason")
     private String rejectionReason;

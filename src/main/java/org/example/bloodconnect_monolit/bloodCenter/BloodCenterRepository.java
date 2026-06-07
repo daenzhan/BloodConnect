@@ -13,4 +13,5 @@ public interface BloodCenterRepository extends JpaRepository<BloodCenter, Long> 
     Optional<BloodCenter> findByUser_Email(String email);
     List<BloodCenter> findByVerificationStatus(String status);
     long countByVerificationStatus(String status);
+    
 }
