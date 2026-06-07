@@ -9,6 +9,60 @@ import { ProfileCard } from "./profile-card";
 import { AiChatBot } from "./AiChatBot";
 import { DonorContextProvider, useDonorContext } from "./DonorContextProvider";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Bell, ChevronRight } from "lucide-react";
+
+// Компонент виджета активных вызовов
+function ActiveCallsWidget({ userId }: { userId: string }) {
+    const [calls, setCalls] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCalls = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
+                const response = await fetch(`http://localhost:8080/donor-calls/donor/${userId}/pending`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.calls) {
+                        setCalls(data.calls);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching calls:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        if (userId) fetchCalls();
+    }, [userId]);
+
+    if (isLoading || calls.length === 0) return null;
+
+    return (
+        <Link href={`/dashboard/for-donor/calls?userId=${userId}`}>
+            <Card className="p-4 bg-destructive/10 border-destructive/30 hover:shadow-md transition-all cursor-pointer mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center animate-pulse">
+                        <Bell className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="font-semibold text-foreground">Urgent Donation Request</p>
+                        <p className="text-sm text-muted-foreground">
+                            You have {calls.length} active call{calls.length > 1 ? 's' : ''}
+                        </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </div>
+            </Card>
+        </Link>
+    );
+}
 
 // Внутренний компонент, который использует контекст
 function DashboardContent() {
@@ -211,6 +265,9 @@ function DashboardContent() {
                     </div>
                     <ProfileCard userId={userId} onLogout={handleLogout} showBookButton={true} />
                 </header>
+
+                {/* Active Calls Widget - Добавлен здесь */}
+                <ActiveCallsWidget userId={userId} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <WelcomeCard

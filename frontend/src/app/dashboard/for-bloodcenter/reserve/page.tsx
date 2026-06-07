@@ -38,7 +38,8 @@ import {
     Heart,
     Layers,
     Plus,
-    Loader2
+    Loader2,
+    Bell
 } from "lucide-react";
 
 const getAuthHeaders = () => {
@@ -304,7 +305,7 @@ export default function BloodReservesPage() {
                     <CenterProfileCard userId={userId} />
                 </header>
 
-                {/* Filters Card - теперь с кнопкой в одной строке */}
+                {/* Filters Card - с кнопками в одной строке */}
                 <Card className="p-4 mb-6">
                     <div className="flex flex-col md:flex-row gap-3">
                         <div className="flex-1 relative">
@@ -355,7 +356,7 @@ export default function BloodReservesPage() {
                             Clear Filters
                         </Button>
 
-                        {/* Кнопка Add Blood - в одной линии с фильтрами */}
+                        {/* Кнопка Add Blood */}
                         <Button
                             onClick={() => setIsCreateModalOpen(true)}
                             size="sm"
@@ -363,6 +364,17 @@ export default function BloodReservesPage() {
                         >
                             <Plus className="w-3.5 h-3.5 mr-1" />
                             Add Blood
+                        </Button>
+
+                        {/* Кнопка Call Donors - ДОБАВЛЕНА */}
+                        <Button
+                            onClick={() => router.push(`/dashboard/for-bloodcenter/call-donors?userId=${userId}`)}
+                            variant="outline"
+                            size="sm"
+                            className="h-9 border-orange-300 text-orange-600 hover:bg-orange-50"
+                        >
+                            <Bell className="w-3.5 h-3.5 mr-1" />
+                            Call Donors
                         </Button>
                     </div>
                 </Card>

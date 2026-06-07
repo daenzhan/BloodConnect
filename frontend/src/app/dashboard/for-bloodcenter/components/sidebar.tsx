@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Home, Droplet, FileText, BarChart3,  Shield, LogOut, ClipboardList, Heart, Calendar } from "lucide-react";
+import { Home, Droplet, FileText, BarChart3,  Shield, LogOut, ClipboardList, Heart, Calendar, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
@@ -38,6 +38,7 @@ export function BloodCenterSidebar({ userId: propUserId }: BloodCenterSidebarPro
         { icon: FileText, label: "Donations", href: `/dashboard/for-bloodcenter/donations?userId=${userId}`, matchExact: false },
         { icon: BarChart3, label: "Statistics", href: `/dashboard/for-bloodcenter/statistics?userId=${userId}`, matchExact: false },
         { icon: Shield, label: "Quarantine", href: `/dashboard/for-bloodcenter/quarantine?userId=${userId}`, matchExact: false },
+        { icon: Bell, label: "Call Donors", href: `/dashboard/for-bloodcenter/call-donors?userId=${userId}`, matchExact: false },
     ];
 
     const isActive = (item: typeof navItems[0]) => {

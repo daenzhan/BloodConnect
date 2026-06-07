@@ -37,14 +37,14 @@ public class BloodReserveController {
         try {
             Optional<Analysis> analysisOpt = analysisRepository.findById(analysisId);
             if (analysisOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Analysis not found"));
+                return ResponseEntity.badRequest().body(Map.of("error", "analysis not found"));
             }
 
             Analysis analysis = analysisOpt.get();
 
             if (!"APPROVED".equals(analysis.getStatus()) && !analysis.isDonorEligible()) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Cannot create blood reserve from rejected analysis"
+                        "error", "cannot create blood reserve from rejected analysis"
                 ));
             }
 
@@ -84,7 +84,7 @@ public class BloodReserveController {
             BloodReserve saved = bloodReserveRepository.save(reserve);
 
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Blood reserve created successfully");
+            response.put("message", "blood reserve created successfully");
             response.put("reserveId", saved.getReserveId());
             response.put("donationId", saved.getDonationId());
             response.put("expirationDate", saved.getExpirationDate());
@@ -115,11 +115,11 @@ public class BloodReserveController {
 
             Optional<BloodCenter> bloodCenterOpt = bloodCenterRepository.findById(bloodCenterId);
             if (bloodCenterOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Blood center not found"));
+                return ResponseEntity.badRequest().body(Map.of("error", "blood center not found"));
             }
 
             Long systemDonorId = 1L;
-            Long systemDonationId = System.currentTimeMillis();
+            Long systemDonationId = System.currentTimeMillis(); // возвращает миллисекунды
 
             BloodReserve reserve = new BloodReserve();
             reserve.setComponentType(componentType);
@@ -129,7 +129,7 @@ public class BloodReserveController {
             reserve.setDonationId(systemDonationId);
             reserve.setDonorId(systemDonorId);
             reserve.setBloodCenter(bloodCenterOpt.get());
-            reserve.setNotes(notes != null ? notes : "Manually added to inventory");
+            reserve.setNotes(notes != null ? notes : "manually added to inventory");
             reserve.setAnalysisId(0L);
 
             if ("PLASMA".equals(componentType)) {
@@ -147,7 +147,7 @@ public class BloodReserveController {
             BloodReserve saved = bloodReserveRepository.save(reserve);
 
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Component added successfully");
+            response.put("message", "component added successfully");
             response.put("reserveId", saved.getReserveId());
             response.put("expirationDate", saved.getExpirationDate());
 
@@ -173,7 +173,7 @@ public class BloodReserveController {
             bloodReserveRepository.save(reserve);
 
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Quantity updated successfully");
+            response.put("message", "quantity updated successfully");
             response.put("quantity", newQuantity);
 
             return ResponseEntity.ok(response);
@@ -287,7 +287,7 @@ public class BloodReserveController {
             bloodReserveRepository.delete(reserveOpt.get());
 
             return ResponseEntity.ok(Map.of(
-                    "message", "Reserve deleted successfully",
+                    "message", "reserve deleted successfully",
                     "reserveId", reserveId
             ));
 
@@ -315,10 +315,9 @@ public class BloodReserveController {
                 ));
             }
 
-            // 3. Парсим объем из строки (например "500 ml" -> 500)
+            // 500 ml -> 500
             int requestedVolume = parseVolume(request.getVolume());
 
-            // 4. Найти подходящие резервы
             List<BloodReserve> suitableReserves = bloodReserveRepository.findSuitableReserves(
                     request.getBloodCenter().getBloodCenterId(),
                     request.getComponentType(),
@@ -329,11 +328,11 @@ public class BloodReserveController {
 
             if (suitableReserves.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "error", "No suitable blood reserves found for this request"
+                        "error", "no suitable blood reserves found for this request"
                 ));
             }
 
-            // 5. Списать кровь из резервов (FIFO - сначала старые)
+            // FIFO
             int remainingToFulfill = requestedVolume;
             int usedReservesCount = 0;
             List<Map<String, Object>> usedReserves = new java.util.ArrayList<>();
@@ -344,7 +343,6 @@ public class BloodReserveController {
                 int availableQuantity = reserve.getQuantity();
                 int takenQuantity = Math.min(availableQuantity, remainingToFulfill);
 
-                // Обновляем количество
                 reserve.setQuantity(availableQuantity - takenQuantity);
                 bloodReserveRepository.save(reserve);
 
@@ -361,7 +359,7 @@ public class BloodReserveController {
                 usedReserves.add(used);
             }
 
-            // 6. Проверить, удалось ли полностью выполнить заявку
+            // удалось ли полностью выполнить заявку
             if (remainingToFulfill > 0) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "Insufficient blood quantity",
@@ -393,13 +391,11 @@ public class BloodReserveController {
 
     private int parseVolume(String volumeStr) {
         if (volumeStr == null) return 0;
-        // Извлекаем число из строки типа "500 ml", "250ml", "1 L" и т.д.
         String digits = volumeStr.replaceAll("[^0-9]", "");
         if (digits.isEmpty()) return 0;
 
         int volume = Integer.parseInt(digits);
 
-        // Если указано в литрах, конвертируем в мл
         if (volumeStr.toLowerCase().contains("l") && !volumeStr.toLowerCase().contains("ml")) {
             volume *= 1000;
         }
@@ -407,20 +403,18 @@ public class BloodReserveController {
         return volume;
     }
 
-    // В BloodReserveController.java добавьте этот метод
     @GetMapping("/bloodcenter/{bloodCenterId}/grouped")
     public ResponseEntity<?> getGroupedReserves(@PathVariable Long bloodCenterId) {
         try {
             List<BloodReserve> reserves = bloodReserveRepository.findByBloodCenter_BloodCenterId(bloodCenterId);
 
-            // Фильтруем только доступные, не в карантине и не просроченные
+            // фильтрация - только доступные, не в карантине и не просроченные
             List<BloodReserve> availableReserves = reserves.stream()
                     .filter(r -> r.getIsAvailable() && !r.getInQuarantine() &&
                             r.getExpirationDate().isAfter(LocalDateTime.now()) &&
                             r.getQuantity() > 0)
                     .collect(Collectors.toList());
 
-            // Группируем на бэкенде без отдельного DTO
             Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
 
             for (BloodReserve reserve : availableReserves) {

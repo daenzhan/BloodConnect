@@ -366,12 +366,6 @@ function AppointmentsContent() {
                         <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-xl font-semibold mb-2">No Appointments Yet</h3>
                         <p className="text-muted-foreground mb-4">You haven't scheduled any donation appointments</p>
-                        <Button
-                            onClick={() => router.push(`/dashboard/for-donor/book-donation?userId=${userId}`)}
-                            className="bg-primary hover:bg-primary/90"
-                        >
-                            Book Your First Appointment
-                        </Button>
                     </Card>
                 ) : (
                     <div className="space-y-4">

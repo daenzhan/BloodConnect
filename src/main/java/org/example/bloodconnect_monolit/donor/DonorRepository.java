@@ -1,6 +1,8 @@
 package org.example.bloodconnect_monolit.donor;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.time.LocalDate;
@@ -28,5 +30,32 @@ public interface DonorRepository extends JpaRepository<Donor, Long> {
     List<Donor> findByHeightBetween(Double minHeight, Double maxHeight);
     List<Donor> findByGender(String gender);
     List<Donor> findByBirthDateBetween(LocalDate startDate, LocalDate endDate);
+
+    @Query("SELECT d FROM Donor d WHERE " +
+            "LOWER(d.city) = LOWER(:city) " +
+            "AND d.bloodGroup = :bloodGroup " +
+            "AND UPPER(d.rhesusFactor) = UPPER(:rhesusFactor) " +
+            "AND d.donorStatus = 'ACTIVE' " +
+            "AND d.user.isActive = true " +
+            "AND d.weight >= 50 " +
+            "AND (d.lastDonationDate IS NULL OR d.lastDonationDate <= :minDonationInterval) " +
+            "ORDER BY d.donationCount DESC, d.lastDonationDate ASC NULLS FIRST")
+    List<Donor> findEligibleDonorsForCall(@Param("city") String city,
+                                          @Param("bloodGroup") String bloodGroup,
+                                          @Param("rhesusFactor") String rhesusFactor,
+                                          @Param("minDonationInterval") LocalDate minDonationInterval);
+
+    List<Donor> findByCityAndBloodGroupAndRhesusFactorAndDonorStatus(
+            String city, String bloodGroup, String rhesusFactor, String donorStatus);
+
+    // для проверки, может ли донор сдавать кровь
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM Donor d " +
+            "WHERE d.donorId = :donorId " +
+            "AND d.donorStatus = 'ACTIVE' " +
+            "AND d.user.isActive = true " +
+            "AND d.weight >= 50 " +
+            "AND (d.lastDonationDate IS NULL OR d.lastDonationDate <= :minDonationInterval)")
+    boolean isDonorEligibleForDonation(@Param("donorId") Long donorId,
+                                       @Param("minDonationInterval") LocalDate minDonationInterval);
 
 }

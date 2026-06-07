@@ -25,21 +25,17 @@ public class BloodRequestController {
     @PostMapping("/create")
     public ResponseEntity<BloodRequest> createBloodRequest(@RequestBody BloodRequest request) {
         try {
-            System.out.println("Received request: " + request);
-
             if (request.getBloodCenter() == null || request.getBloodCenter().getBloodCenterId() == null) {
                 return ResponseEntity.badRequest().build();
             }
 
             request.setStatus("PENDING");
             request.setCreateAt(LocalDateTime.now());
-
             BloodRequest savedRequest = bloodRequestRepository.save(request);
-            System.out.println("Saved request with ID: " + savedRequest.getBloodRequestId());
 
             return ResponseEntity.ok(savedRequest);
         } catch (Exception e) {
-            System.err.println("Error creating request: " + e.getMessage());
+            System.err.println("error creating request: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.badRequest().build();
         }
@@ -109,7 +105,6 @@ public class BloodRequestController {
         }
     }
 
-    // ДЕБАГ: просмотр всех резервов
     @GetMapping("/debug/reserves/{bloodCenterId}")
     public ResponseEntity<?> debugReserves(@PathVariable Long bloodCenterId) {
         try {
@@ -136,7 +131,6 @@ public class BloodRequestController {
         }
     }
 
-    // ПРОВЕРКА ДОСТУПНОСТИ (с улучшенным логированием)
     @GetMapping("/{requestId}/check-availability")
     public ResponseEntity<?> checkAvailability(@PathVariable Long requestId) {
         try {
@@ -149,12 +143,12 @@ public class BloodRequestController {
             int requestedVolume = parseVolume(request.getVolume());
 
             System.out.println("=== CHECKING AVAILABILITY ===");
-            System.out.println("Request ID: " + requestId);
-            System.out.println("Component: " + request.getComponentType());
-            System.out.println("Blood Group: " + request.getBloodGroup());
-            System.out.println("Rhesus Factor: " + request.getRhesusFactor());
-            System.out.println("Requested Volume: " + requestedVolume);
-            System.out.println("Blood Center ID: " + request.getBloodCenter().getBloodCenterId());
+            System.out.println("request ID: " + requestId);
+            System.out.println("component: " + request.getComponentType());
+            System.out.println("blood group: " + request.getBloodGroup());
+            System.out.println("rhesus factor: " + request.getRhesusFactor());
+            System.out.println("requested volume: " + requestedVolume);
+            System.out.println("blood center ID: " + request.getBloodCenter().getBloodCenterId());
 
             List<BloodReserve> suitableReserves = bloodReserveRepository.findSuitableReserves(
                     request.getBloodCenter().getBloodCenterId(),
@@ -164,7 +158,7 @@ public class BloodRequestController {
                     LocalDateTime.now()
             );
 
-            System.out.println("Found suitable reserves: " + suitableReserves.size());
+            System.out.println("found suitable reserves: " + suitableReserves.size());
             for (BloodReserve reserve : suitableReserves) {
                 System.out.println("  - Reserve " + reserve.getReserveId() +
                         ": " + reserve.getComponentType() +
@@ -205,32 +199,32 @@ public class BloodRequestController {
         }
     }
 
-    // ВЫПОЛНЕНИЕ ЗАЯВКИ
+    // выполнение заявки + работа резерва
     @PostMapping("/{requestId}/execute")
     @Transactional
     public ResponseEntity<?> executeBloodRequest(@PathVariable Long requestId) {
         try {
             Optional<BloodRequest> requestOpt = bloodRequestRepository.findById(requestId);
             if (requestOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Blood request not found"));
+                return ResponseEntity.badRequest().body(Map.of("error", "blood request not found"));
             }
 
             BloodRequest request = requestOpt.get();
 
             if (!"PENDING".equals(request.getStatus())) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Cannot execute request with status: " + request.getStatus()
+                        "error", "cannot execute request with status: " + request.getStatus()
                 ));
             }
 
             int requestedVolume = parseVolume(request.getVolume());
             if (requestedVolume <= 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Invalid volume format"));
+                return ResponseEntity.badRequest().body(Map.of("error", "invalid volume format"));
             }
 
             System.out.println("=== EXECUTING REQUEST ===");
-            System.out.println("Request ID: " + requestId);
-            System.out.println("Requested Volume: " + requestedVolume);
+            System.out.println("request ID: " + requestId);
+            System.out.println("requested volume: " + requestedVolume);
 
             List<BloodReserve> suitableReserves = bloodReserveRepository.findSuitableReserves(
                     request.getBloodCenter().getBloodCenterId(),
@@ -242,7 +236,7 @@ public class BloodRequestController {
 
             if (suitableReserves.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "error", "No suitable blood reserves found for this request"
+                        "error", "no suitable blood reserves found for this request"
                 ));
             }
 

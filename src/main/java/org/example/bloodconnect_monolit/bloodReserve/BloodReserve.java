@@ -68,15 +68,13 @@ public class BloodReserve {
         createdDate = LocalDateTime.now();
         calculateExpirationDate();
 
-        // Логика для карантина и доступности
+        // for quarantine
         if ("PLASMA".equals(componentType)) {
-            // Плазма требует карантин
             if (inQuarantine && quarantineEndDate == null) {
-                quarantineEndDate = createdDate.plusDays(90); // 90 дней для плазмы
+                quarantineEndDate = createdDate.plusDays(90);
             }
-            isAvailable = false; // Плазма не доступна до окончания карантина
+            isAvailable = false;
         } else {
-            // Остальные компоненты сразу готовы
             inQuarantine = false;
             isAvailable = true;
             quarantineEndDate = null;
@@ -97,9 +95,6 @@ public class BloodReserve {
                 break;
             case "PLASMA":
                 expirationDate = now.plusYears(3);
-                break;
-            case "CRYOPRECIPITATE":
-                expirationDate = now.plusYears(2);
                 break;
             default:
                 expirationDate = now.plusDays(30);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Home, Heart, Calendar, User, MapPin, FileText, LogOut, MessageSquare, Droplet } from "lucide-react";
+import { Home, Heart, Calendar, User, MapPin, FileText, LogOut, MessageSquare, Droplet, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
@@ -33,6 +33,7 @@ export function Sidebar() {
         { icon: MapPin, label: "Find Centers", href: `/dashboard/for-donor/find-centers?userId=${userId}`, matchExact: false },
         { icon: FileText, label: "Analysis Results", href: `/dashboard/for-donor/analysis?userId=${userId}`, matchExact: false },
         { icon: User, label: "Top Donors", href: `/dashboard/for-donor/top-donors?userId=${userId}`, matchExact: false },
+        { icon: Bell, label: "Donation Calls", href: `/dashboard/for-donor/calls?userId=${userId}`, matchExact: false },
     ];
 
     const isActive = (item: typeof navItems[0]) => {

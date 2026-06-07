@@ -7,8 +7,6 @@ import { CenterProfileCard } from "./components/center-profile-card";
 import { WelcomeCard } from "./components/welcome-card";
 import { QuickActions } from "./components/quick-actions";
 import { RecentDonations } from "./components/recent-donations";
-import {Card} from "@/components/ui/card";
-import {Clock} from "lucide-react";
 
 interface Donation {
     donationId: number;
@@ -246,74 +244,7 @@ export default function BloodCenterDashboard() {
             </div>
         );
     }
-    const checkVerificationStatus = async () => {
-        if (!bloodCenterId) return;
-        try {
-            const headers = getAuthHeaders();
-            if (!headers) return;
 
-            const response = await fetch(`http://localhost:8080/blood-centers/${bloodCenterId}/verification-status`, {
-                headers: headers
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.status !== 'APPROVED') {
-                    setVerificationStatus(data.status);
-                    setRejectionReason(data.rejectionReason);
-                    return false;
-                }
-            }
-            return true;
-        } catch (error) {
-            console.error("Error checking verification:", error);
-            return false;
-        }
-    };
-
-
-    const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
-    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
-
-
-    useEffect(() => {
-        if (bloodCenterId) {
-            checkVerificationStatus();
-        }
-    }, [bloodCenterId]);
-
-
-    if (verificationStatus && verificationStatus !== 'APPROVED') {
-        return (
-            <div className="min-h-screen bg-background">
-                <BloodCenterSidebar userId={userId} />
-                <main className="ml-20 lg:ml-64 p-6 flex items-center justify-center min-h-screen">
-                    <Card className="max-w-md p-8 text-center">
-                        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Clock className="w-8 h-8 text-yellow-600" />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2">Account Pending Verification</h2>
-                        <p className="text-muted-foreground mb-4">
-                            Your blood center account is awaiting admin approval.
-                            You will receive an email once your license is verified.
-                        </p>
-                        {verificationStatus === 'REJECTED' && rejectionReason && (
-                            <div className="mt-4 p-3 bg-red-50 rounded-lg">
-                                <p className="text-sm text-red-600 font-medium">Rejection Reason:</p>
-                                <p className="text-sm text-red-600">{rejectionReason}</p>
-                            </div>
-                        )}
-                        <Button
-                            onClick={() => window.location.href = '/auth/login'}
-                            className="mt-4"
-                        >
-                            Go to Login
-                        </Button>
-                    </Card>
-                </main>
-            </div>
-        );
-    }
     return (
         <>
             <BloodCenterSidebar userId={userId} />

@@ -1,12 +1,12 @@
 package org.example.bloodconnect_monolit.bloodCenter;
 
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
+import org.example.bloodconnect_monolit.bloodReserve.BloodReserveRepository;
 import org.example.bloodconnect_monolit.donation.Donation;
 import org.example.bloodconnect_monolit.donation.DonationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.example.bloodconnect_monolit.bloodReserve.BloodReserve;
-import org.example.bloodconnect_monolit.bloodReserve.BloodReserveRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -45,7 +45,7 @@ public class BloodCenterController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Получение всех резервов крови для центра
+    // получить все резервы одного центра крови
     @GetMapping("/{bloodCenterId}/reserves")
     public ResponseEntity<?> getReserves(@PathVariable Long bloodCenterId) {
         try {
@@ -120,7 +120,6 @@ public class BloodCenterController {
         }
     }
 
-    // Получение инвентаря
     @GetMapping("/{bloodCenterId}/inventory")
     public ResponseEntity<?> getInventory(@PathVariable Long bloodCenterId) {
         try {

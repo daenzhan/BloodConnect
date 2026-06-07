@@ -34,40 +34,36 @@ public class DonationController {
         try {
             Optional<Appointment> appointmentOpt = appointmentRepository.findById(appointmentId);
             if (appointmentOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Appointment not found"));
+                return ResponseEntity.badRequest().body(Map.of("error", "appointment not found"));
             }
 
             Appointment appointment = appointmentOpt.get();
 
-            // Проверяем, не создана ли уже донация
             if (appointment.getDonation() != null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Donation already exists for this appointment"));
+                return ResponseEntity.badRequest().body(Map.of("error", "donation already exists for this appointment"));
             }
 
-            // Создаем новую донацию
             Donation donation = new Donation();
             donation.setDonor(appointment.getDonor());
             donation.setBloodCenter(appointment.getBloodCenter());
             donation.setAppointment(appointment);
             donation.setDonationDate(LocalDateTime.now());
-            donation.setStatus("COMPLETED"); // Статус донации = COMPLETED
+            donation.setStatus("COMPLETED");
             donation.setHasAnalysis(false);
 
             Donation savedDonation = donationRepository.save(donation);
 
-            // Связываем донацию с записью
             appointment.setDonation(savedDonation);
-            appointment.setStatus("COMPLETED"); // Статус записи тоже COMPLETED
+            appointment.setStatus("COMPLETED");
             appointmentRepository.save(appointment);
 
-            // Обновляем информацию о доноре
             var donor = appointment.getDonor();
             donor.setLastDonationDate(LocalDateTime.now().toLocalDate());
             donor.setDonationCount((donor.getDonationCount() != null ? donor.getDonationCount() : 0) + 1);
             donorRepository.save(donor);
 
             return ResponseEntity.ok(Map.of(
-                    "message", "Donation completed successfully",
+                    "message", "donation completed successfully",
                     "donationId", savedDonation.getDonationId(),
                     "status", savedDonation.getStatus()
             ));
@@ -78,7 +74,7 @@ public class DonationController {
         }
     }
 
-    // Новый метод: обновление статуса донации вместе с записью
+    // обновление статуса донации вместе с записью
     @PutMapping("/{donationId}/status-with-appointment")
     public ResponseEntity<?> updateDonationAndAppointmentStatus(
             @PathVariable Long donationId,
@@ -96,7 +92,6 @@ public class DonationController {
             donation.setStatus(donationStatus);
             donationRepository.save(donation);
 
-            // Обновляем статус связанной записи
             Appointment appointment = donation.getAppointment();
             if (appointment != null && appointmentStatus != null) {
                 appointment.setStatus(appointmentStatus);
@@ -104,7 +99,7 @@ public class DonationController {
             }
 
             return ResponseEntity.ok(Map.of(
-                    "message", "Statuses updated successfully",
+                    "message", "statuses updated successfully",
                     "donationStatus", donation.getStatus(),
                     "appointmentStatus", appointment != null ? appointment.getStatus() : null
             ));
@@ -119,7 +114,7 @@ public class DonationController {
     public ResponseEntity<?> getDonorDonationsByUserId(@PathVariable Long userId) {
         try {
             var donor = donorRepository.findByUser_UserId(userId)
-                    .orElseThrow(() -> new RuntimeException("Donor not found for user ID: " + userId));
+                    .orElseThrow(() -> new RuntimeException("donor not found for user ID: " + userId));
 
             List<Donation> donations = donationRepository.findByDonor_DonorId(donor.getDonorId());
             return ResponseEntity.ok(donations);
@@ -131,7 +126,7 @@ public class DonationController {
     @GetMapping("/bloodcenter/{bloodCenterId}/date")
     public ResponseEntity<?> getDonationsByDate(@PathVariable Long bloodCenterId, @RequestParam String date) {
         try {
-            LocalDateTime startOfDay = LocalDate.parse(date).atStartOfDay();
+            LocalDateTime startOfDay = LocalDate.parse(date).atStartOfDay(); // atStartOfDay() - LocalDate с полночи
             LocalDateTime endOfDay = startOfDay.plusDays(1);
 
             List<Donation> donations = donationRepository.findByBloodCenter_BloodCenterIdAndDonationDateBetween(
@@ -143,7 +138,6 @@ public class DonationController {
         }
     }
 
-    // Добавьте в DonationController.java
     @GetMapping("/appointment/{appointmentId}")
     public ResponseEntity<?> getDonationByAppointmentId(@PathVariable Long appointmentId) {
         try {
@@ -152,7 +146,7 @@ public class DonationController {
             if (donationOpt.isEmpty()) {
                 return ResponseEntity.status(404).body(Map.of(
                         "exists", false,
-                        "message", "Donation not found for this appointment"
+                        "message", "donation not found for this appointment"
                 ));
             }
 
