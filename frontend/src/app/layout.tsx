@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Suspense } from 'react'
 import './globals.css'
 
 const inter = Inter({
@@ -33,7 +34,9 @@ export default function RootLayout({
     return (
         <html lang="en">
         <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
-        {children}
+        <Suspense fallback={null}>
+            {children}
+        </Suspense>
         <Analytics />
         </body>
         </html>
