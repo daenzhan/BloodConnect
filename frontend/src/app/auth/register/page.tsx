@@ -209,32 +209,94 @@ export default function RegisterPage() {
         }
     }
 
-    const updateProfileLicense = async (userId: number, type: string, fileName: string) => {
+    const updateProfileLicense = async (userId: number, type: string, fileName: string, retryCount = 0): Promise<boolean> => {
         const token = localStorage.getItem('token');
-        let url = '';
-        if (type === 'BLOOD_CENTER') {
-            const centerResponse = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const centerData = await centerResponse.json();
-            url = `http://localhost:8080/blood-centers/${centerData.bloodCenterId}/license`;
-        } else {
-            const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const centerData = await centerResponse.json();
-            url = `http://localhost:8080/medcenter/${centerData.medCenterId}/license`;
+        if (!token) {
+            console.error("No token found");
+            return false;
         }
-        await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ licenseFile: fileName })
-        });
-    };
 
+        let url = '';
+        try {
+            if (type === 'BLOOD_CENTER') {
+                // Ждем и повторяем попытки, если центр еще не создан
+                let centerData = null;
+                let attempts = 0;
+                while (!centerData && attempts < 5) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const centerResponse = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (centerResponse.ok) {
+                        centerData = await centerResponse.json();
+                        break;
+                    }
+                    attempts++;
+                    console.log(`Attempt ${attempts}: Waiting for blood center to be created...`);
+                }
+
+                if (!centerData) {
+                    console.error("Blood center not found after multiple attempts");
+                    return false;
+                }
+                url = `http://localhost:8080/blood-centers/${centerData.bloodCenterId}/license`;
+            } else {
+                let centerData = null;
+                let attempts = 0;
+                while (!centerData && attempts < 5) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const centerResponse = await fetch(`http://localhost:8080/medcenter/user/${userId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (centerResponse.ok) {
+                        centerData = await centerResponse.json();
+                        break;
+                    }
+                    attempts++;
+                    console.log(`Attempt ${attempts}: Waiting for medical center to be created...`);
+                }
+
+                if (!centerData) {
+                    console.error("Medical center not found after multiple attempts");
+                    return false;
+                }
+                url = `http://localhost:8080/medcenter/${centerData.medCenterId}/license`;
+            }
+
+            console.log("Updating license at URL:", url);
+            console.log("With fileName:", fileName);
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ licenseFile: fileName })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Failed to update license:", response.status, errorText);
+
+                // Если получили 404, возможно центр еще не создан - повторяем
+                if (response.status === 404 && retryCount < 3) {
+                    console.log(`Retry ${retryCount + 1} for updating license...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return updateProfileLicense(userId, type, fileName, retryCount + 1);
+                }
+                return false;
+            }
+
+            const result = await response.json();
+            console.log("License update response:", result);
+            return true;
+
+        } catch (error) {
+            console.error("Error updating license:", error);
+            return false;
+        }
+    };
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -274,18 +336,41 @@ export default function RegisterPage() {
             if (userId && (baseData.role === "BLOOD_CENTER" || baseData.role === "MEDICAL_CENTER")) {
                 let fileToUpload: File | null = null;
                 let type = "";
+
                 if (baseData.role === "BLOOD_CENTER" && bloodCenterData.licenseFile) {
                     fileToUpload = bloodCenterData.licenseFile;
                     type = "BLOOD_CENTER";
+                    console.log("Will upload blood center license");
                 } else if (baseData.role === "MEDICAL_CENTER" && medicalCenterData.licenseFile) {
                     fileToUpload = medicalCenterData.licenseFile;
                     type = "MEDICAL_CENTER";
+                    console.log("Will upload medical center license");
                 }
+
                 if (fileToUpload) {
                     try {
+                        // Сначала загружаем файл
+                        console.log("Uploading file...");
                         const uploadResult = await uploadLicenseFile(fileToUpload, type, userId);
                         console.log('License uploaded:', uploadResult);
-                        await updateProfileLicense(userId, type, uploadResult.fileName);
+
+                        if (uploadResult && uploadResult.fileName) {
+                            // Небольшая задержка перед обновлением, чтобы БД успела сохранить центр
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+
+                            // Затем обновляем профиль с именем файла
+                            const updateSuccess = await updateProfileLicense(userId, type, uploadResult.fileName);
+
+                            if (updateSuccess) {
+                                console.log("License file name saved to database!");
+                            } else {
+                                console.warn("Failed to save license file name to database");
+                                setError("Account created, but license could not be saved. Please contact support.");
+                            }
+                        } else {
+                            console.error("No fileName in upload result");
+                            setError("Account created, but license upload failed. Please contact support.");
+                        }
                     } catch (uploadError) {
                         console.error('Failed to upload license:', uploadError);
                         setError("Account created but license upload failed. Please contact support.");
@@ -293,16 +378,23 @@ export default function RegisterPage() {
                 }
             }
 
-            if (role === "DONOR") router.push(`/dashboard/for-donor?userId=${userId}`)
-            else if (role === "BLOOD_CENTER") router.push(`/dashboard/for-bloodcenter?userId=${userId}`)
-            else if (role === "MEDICAL_CENTER") router.push(`/dashboard/for-medcenter?userId=${userId}`)
-            else router.push("/dashboard")
+            if (role === "DONOR") {
+                router.push(`/dashboard/for-donor?userId=${userId}`);
+            } else if (role === "BLOOD_CENTER") {
+                router.push(`/dashboard/for-bloodcenter?userId=${userId}`);
+            } else if (role === "MEDICAL_CENTER") {
+                router.push(`/dashboard/for-medcenter?userId=${userId}`);
+            } else {
+                router.push("/dashboard");
+            }
+
         } catch (err: any) {
-            setError(err.response?.data?.error || err.message || "Registration failed")
+            console.error("Registration error:", err);
+            setError(err.response?.data?.error || err.message || "Registration failed");
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     const handleVerifyCode = async (e: React.FormEvent) => {
         e.preventDefault()

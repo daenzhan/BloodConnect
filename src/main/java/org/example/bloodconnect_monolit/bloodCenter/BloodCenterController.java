@@ -183,8 +183,8 @@ public class BloodCenterController {
         stats.put("livesSaved", livesSaved);
         stats.put("avgDonationsPerDay", Math.round(avgPerDay * 10) / 10.0);
 
-        List<Map<String, Object>> bloodTypeDistribution = new ArrayList<>();
 
+        List<Map<String, Object>> bloodTypeDistribution = new ArrayList<>();
         if (totalDonations > 0) {
             Map<String, Long> bloodTypeCount = new HashMap<>();
             for (Donation donation : donations) {
@@ -204,6 +204,7 @@ public class BloodCenterController {
             }
         }
 
+
         List<Map<String, Object>> monthlyData = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM");
@@ -212,19 +213,25 @@ public class BloodCenterController {
             LocalDateTime start = now.minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
             LocalDateTime end = start.plusMonths(1);
 
-            long count = 0;
+
+            long donationsCount = 0;
+            Set<Long> donorsInMonth = new HashSet<>();
+
             for (Donation donation : donations) {
                 if (donation.getDonationDate() != null &&
                         donation.getDonationDate().isAfter(start) &&
                         donation.getDonationDate().isBefore(end)) {
-                    count++;
+                    donationsCount++;
+                    donorsInMonth.add(donation.getDonor().getDonorId());
                 }
             }
 
+            long newDonorsCount = 0;
+
             Map<String, Object> monthMap = new HashMap<>();
-            monthMap.put("month", start.format(formatter));
-            monthMap.put("donations", count);
-            monthMap.put("newDonors", 0);
+            monthMap.put("month", start.format(formatter) + " " + start.getYear());
+            monthMap.put("donations", donationsCount);
+            monthMap.put("newDonors", newDonorsCount);
             monthlyData.add(monthMap);
         }
 

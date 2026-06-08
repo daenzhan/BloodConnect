@@ -41,7 +41,8 @@ import {
     MapPin,
     Search,
     Eye,
-    RefreshCw
+    RefreshCw,
+    Shield
 } from "lucide-react";
 
 const getAuthHeaders = () => {
@@ -87,6 +88,8 @@ export default function CallDonorsPage() {
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [callResult, setCallResult] = useState<any>(null);
     const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         bloodGroup: "",
@@ -97,7 +100,51 @@ export default function CallDonorsPage() {
         customMessage: ""
     });
 
+    // ============== ПРОВЕРКА ВЕРИФИКАЦИИ ==============
+    const checkVerification = async () => {
+        if (!userId) return;
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, { headers });
+
+            if (response.status === 403) {
+                setVerificationStatus("PENDING");
+                setIsLoading(false);
+                return;
+            }
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                router.push('/auth/login');
+                return;
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                setVerificationStatus(data.verificationStatus || "APPROVED");
+                setRejectionReason(data.rejectionReason || null);
+            }
+        } catch (err) {
+            console.error("Error checking verification:", err);
+        }
+    };
+
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            router.push('/auth/login');
+            return;
+        }
+        checkVerification();
+    }, [userId, router]);
+
+    useEffect(() => {
+        if (verificationStatus !== "APPROVED") {
+            setIsLoading(false);
+            return;
+        }
+
         const fetchCenter = async () => {
             if (!userId) return;
             try {
@@ -127,7 +174,7 @@ export default function CallDonorsPage() {
             }
         };
         fetchCenter();
-    }, [userId, router]);
+    }, [userId, router, verificationStatus]);
 
     const fetchCallHistory = async () => {
         if (!bloodCenterId) return;
@@ -245,6 +292,130 @@ export default function CallDonorsPage() {
 
     const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString();
 
+    // ============== КОМПОНЕНТЫ ДЛЯ СТАТУСОВ ==============
+    const renderPendingVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <Clock className="w-12 h-12 text-white" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-amber-800 mb-3">Account Pending Verification</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account is awaiting approval from the administrator.
+                </p>
+
+                <div className="bg-amber-50 rounded-xl p-4 mb-6 text-left border border-amber-200">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-amber-800 mb-1">Why is this happening?</p>
+                            <p className="text-amber-700">All blood centers must have their license verified before accessing the system.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What happens next?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Admin will review your license document</li>
+                                <li>• You will receive an email notification once approved</li>
+                                <li>• After approval, you can call donors</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => router.push('/auth/login')} variant="outline" className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50">
+                        Back to Login
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white">
+                        Refresh Status
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Need help? Contact support at support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+    const renderRejectedVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <XCircle className="w-12 h-12 text-white" />
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-red-800 mb-3">Account Not Verified</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-red-400 to-red-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account could not be verified by the administrator.
+                </p>
+
+                {rejectionReason && (
+                    <div className="bg-red-50 rounded-xl p-4 mb-6 text-left border border-red-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-semibold text-red-800 mb-1">Rejection Reason</p>
+                                <p className="text-red-700">{rejectionReason}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What can you do?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Contact support for more information</li>
+                                <li>• Correct any issues with your license document</li>
+                                <li>• Submit a new registration with updated documents</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => router.push('/auth/login')} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white">
+                        Back to Login
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Contact support: support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+    // ============== РЕНДЕР ==============
+    if (verificationStatus === "PENDING") {
+        return renderPendingVerification();
+    }
+
+    if (verificationStatus === "REJECTED") {
+        return renderRejectedVerification();
+    }
+
     if (isLoading) {
         return (
             <>
@@ -283,7 +454,9 @@ export default function CallDonorsPage() {
                         </div>
                     </div>
 
-                    {/* Error Alert */}
+
+
+
                     {error && (
                         <Card className="p-4 mb-6 bg-red-50 border-red-200">
                             <div className="flex items-start gap-3">
@@ -298,10 +471,8 @@ export default function CallDonorsPage() {
                         </Card>
                     )}
 
-                    {/* Main Form */}
                     <form onSubmit={handleSubmit}>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Left Column - Form Fields */}
                             <div className="lg:col-span-2 space-y-6">
                                 <Card className="p-6">
                                     <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -320,9 +491,7 @@ export default function CallDonorsPage() {
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg">
                                                     {bloodGroups.map(g => (
-                                                        <SelectItem key={g} value={g} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                            {g}
-                                                        </SelectItem>
+                                                        <SelectItem key={g} value={g}>{g}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -338,9 +507,7 @@ export default function CallDonorsPage() {
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg">
                                                     {rhesusFactors.map(rh => (
-                                                        <SelectItem key={rh.value} value={rh.value} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                            {rh.label}
-                                                        </SelectItem>
+                                                        <SelectItem key={rh.value} value={rh.value}>{rh.label}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -356,9 +523,7 @@ export default function CallDonorsPage() {
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg">
                                                     {componentTypes.map(comp => (
-                                                        <SelectItem key={comp.value} value={comp.value} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                            {comp.label}
-                                                        </SelectItem>
+                                                        <SelectItem key={comp.value} value={comp.value}>{comp.label}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -384,8 +549,8 @@ export default function CallDonorsPage() {
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg">
-                                                    <SelectItem value="NORMAL" className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">Normal</SelectItem>
-                                                    <SelectItem value="URGENT" className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">Urgent</SelectItem>
+                                                    <SelectItem value="NORMAL">Normal</SelectItem>
+                                                    <SelectItem value="URGENT">Urgent</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -420,7 +585,6 @@ export default function CallDonorsPage() {
                                 </Card>
                             </div>
 
-                            {/* Right Column - Summary & Action */}
                             <div className="space-y-6">
                                 <Card className="p-6 sticky top-6">
                                     <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -498,7 +662,6 @@ export default function CallDonorsPage() {
                 </div>
             </main>
 
-            {/* Success Dialog */}
             <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
                 <DialogContent className="max-w-md bg-white dark:bg-gray-900">
                     <DialogHeader>
@@ -534,7 +697,6 @@ export default function CallDonorsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* History Dialog */}
             <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900">
                     <DialogHeader>

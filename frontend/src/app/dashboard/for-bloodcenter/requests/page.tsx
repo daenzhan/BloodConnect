@@ -8,7 +8,21 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Building2, Clock, Droplet, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import {
+    Search,
+    User,
+    Calendar,
+    Droplet,
+    Loader2,
+    AlertCircle,
+    Shield,
+    Clock,
+    CheckCircle,
+    XCircle,
+    Mail,
+    AlertTriangle
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -34,47 +48,92 @@ const checkAuthAndRedirect = (response: Response) => {
     return false;
 };
 
-interface BloodRequest {
-    bloodRequestId: number;
-    componentType: string;
-    bloodGroup: string;
-    rhesusFactor: string;
-    volume: string;
-    deadline: string;
+interface Donation {
+    donationId: number;
+    donor: { donorId: number; firstName?: string; lastName?: string };
+    donationDate: string;
     status: string;
-    comment: string;
-    medCenter: { name: string };
-    bloodCenter?: { bloodCenterId: number };
+    analysis?: { bloodGroup?: string; rhesusFactor?: string };
 }
 
 const statusColors: Record<string, string> = {
     PENDING: "bg-yellow-100 text-yellow-800",
-    APPROVED: "bg-green-100 text-green-800",
-    REJECTED: "bg-red-100 text-red-800",
-    IN_PROGRESS: "bg-blue-100 text-blue-800",
-    COMPLETED: "bg-gray-100 text-gray-800",
+    SCHEDULED: "bg-blue-100 text-blue-800",
+    IN_PROGRESS: "bg-purple-100 text-purple-800",
+    COMPLETED: "bg-green-100 text-green-800",
+    AWAITING_ANALYSIS: "bg-orange-100 text-orange-800",
+    FINALIZED: "bg-gray-100 text-gray-800",
 };
 
-export default function BloodRequestsPage() {
+const statusLabels: Record<string, string> = {
+    PENDING: "Pending",
+    SCHEDULED: "Scheduled",
+    IN_PROGRESS: "In Progress",
+    COMPLETED: "Completed",
+    AWAITING_ANALYSIS: "Awaiting Analysis",
+    FINALIZED: "Finalized",
+};
+
+export default function DonationsPage() {
     const searchParams = useSearchParams();
     const userId = searchParams.get('userId');
     const [bloodCenterId, setBloodCenterId] = useState<number | null>(null);
-    const [requests, setRequests] = useState<BloodRequest[]>([]);
-    const [filtered, setFiltered] = useState<BloodRequest[]>([]);
+    const [donations, setDonations] = useState<Donation[]>([]);
+    const [filtered, setFiltered] = useState<Donation[]>([]);
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [executingRequestId, setExecutingRequestId] = useState<number | null>(null);
-    const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
-    const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null);
-    const [availabilityData, setAvailabilityData] = useState<any>(null);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [successData, setSuccessData] = useState<any>(null);
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
+
+    // ============== ПРОВЕРКА ВЕРИФИКАЦИИ ==============
+    const checkVerification = async () => {
+        if (!userId) return;
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
+            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, { headers });
+
+            if (response.status === 403) {
+                setVerificationStatus("PENDING");
+                setIsLoading(false);
+                return;
+            }
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/auth/login';
+                return;
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                setVerificationStatus(data.verificationStatus || "APPROVED");
+                setRejectionReason(data.rejectionReason || null);
+            }
+        } catch (err) {
+            console.error("Error checking verification:", err);
+        }
+    };
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+            return;
+        }
+        checkVerification();
+    }, [userId]);
+
+    // ============== FETCH CENTER ==============
+    useEffect(() => {
         const fetchCenter = async () => {
-            if (!userId) return;
+            if (!userId || verificationStatus !== "APPROVED") return;
+
             try {
                 setError(null);
                 const headers = getAuthHeaders();
@@ -82,12 +141,14 @@ export default function BloodRequestsPage() {
                     window.location.href = '/auth/login';
                     return;
                 }
+                console.log("Fetching blood center for userId:", userId);
                 const res = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
                     headers: headers
                 });
                 if (checkAuthAndRedirect(res)) return;
                 if (res.ok) {
                     const data = await res.json();
+                    console.log("Blood center data received:", data);
                     setBloodCenterId(data.bloodCenterId);
                 } else if (res.status === 404) {
                     setError("Blood center not found for this user");
@@ -99,170 +160,217 @@ export default function BloodRequestsPage() {
                 setError("Network error while fetching blood center");
             }
         };
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/auth/login';
-            return;
-        }
         fetchCenter();
-    }, [userId]);
+    }, [userId, verificationStatus]);
 
-    const refreshRequests = async () => {
-        if (!bloodCenterId) return;
-        try {
-            const headers = getAuthHeaders();
-            if (!headers) return;
-
-            const res = await fetch(`http://localhost:8080/blood-requests/bloodcenter/${bloodCenterId}`, {
-                headers: headers
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setRequests(data);
-                setFiltered(data);
-            }
-        } catch (err) {
-            console.error("Error refreshing:", err);
-        }
-    };
-
+    // ============== FETCH DONATIONS ==============
     useEffect(() => {
-        const fetchRequests = async () => {
-            if (!bloodCenterId) return;
+        const fetchDonations = async () => {
+            if (!bloodCenterId || verificationStatus !== "APPROVED") return;
             try {
                 setIsLoading(true);
                 setError(null);
-                console.log(`Fetching requests for blood center: ${bloodCenterId}`);
-
                 const headers = getAuthHeaders();
                 if (!headers) {
                     window.location.href = '/auth/login';
                     return;
                 }
-
-                const res = await fetch(`http://localhost:8080/blood-requests/bloodcenter/${bloodCenterId}`, {
+                console.log(`Fetching donations for bloodCenterId: ${bloodCenterId}`);
+                const res = await fetch(`http://localhost:8080/donations/bloodcenter/${bloodCenterId}`, {
                     headers: headers
                 });
-
                 if (checkAuthAndRedirect(res)) return;
-
                 if (res.ok) {
                     const data = await res.json();
-                    console.log("Received requests:", data);
-                    setRequests(data);
+                    console.log("Donations data received:", data);
+                    setDonations(data);
                     setFiltered(data);
                 } else {
-                    const errorText = await res.text();
-                    console.error("Failed to fetch requests:", res.status, errorText);
-                    setError(`Failed to fetch requests: ${res.status}`);
+                    setError(`Failed to fetch donations: ${res.status}`);
                 }
             } catch (err) {
-                console.error("Error fetching requests:", err);
+                console.error("Error fetching donations:", err);
                 setError(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
             } finally {
                 setIsLoading(false);
             }
         };
+        fetchDonations();
+    }, [bloodCenterId, verificationStatus]);
 
-        fetchRequests();
-    }, [bloodCenterId]);
-
+    // ============== FILTER DONATIONS ==============
     useEffect(() => {
-        let result = requests;
+        let result = donations;
         if (search) {
-            result = result.filter(r =>
-                r.medCenter?.name?.toLowerCase().includes(search.toLowerCase()) ||
-                r.componentType.toLowerCase().includes(search.toLowerCase()) ||
-                r.bloodGroup.toLowerCase().includes(search.toLowerCase())
+            const searchLower = search.toLowerCase();
+            result = result.filter(d =>
+                (d.donor?.firstName?.toLowerCase().includes(searchLower) ||
+                    d.donor?.lastName?.toLowerCase().includes(searchLower))
             );
         }
         if (statusFilter !== "ALL") {
-            result = result.filter(r => r.status === statusFilter);
+            result = result.filter(d => d.status === statusFilter);
         }
         setFiltered(result);
-    }, [search, statusFilter, requests]);
+    }, [search, statusFilter, donations]);
 
-    const formatDeadline = (deadline: string) => {
-        if (!deadline) return "No deadline";
+    const formatDate = (dateStr: string) => {
         try {
-            const date = new Date(deadline);
-            const daysLeft = Math.ceil((date.getTime() - Date.now()) / (1000 * 3600 * 24));
-            if (daysLeft < 0) return "Overdue";
-            if (daysLeft === 0) return "Today";
-            return `${daysLeft} days left`;
+            return new Date(dateStr).toLocaleString();
         } catch {
             return "Invalid date";
         }
     };
 
-    const checkAvailability = async (request: BloodRequest) => {
-        setSelectedRequest(request);
-        try {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+    // ============== КОМПОНЕНТЫ ДЛЯ СТАТУСОВ ==============
+    const renderPendingVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <Clock className="w-12 h-12 text-white" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                </div>
 
-            const res = await fetch(`http://localhost:8080/blood-requests/${request.bloodRequestId}/check-availability`, {
-                headers: headers
-            });
+                <h2 className="text-2xl font-bold text-amber-800 mb-3">Account Pending Verification</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto mb-6"></div>
 
-            if (checkAuthAndRedirect(res)) return;
+                <p className="text-gray-600 mb-6">
+                    Your blood center account is awaiting approval from the administrator.
+                </p>
 
-            if (res.ok) {
-                const data = await res.json();
-                setAvailabilityData(data);
-                setShowAvailabilityModal(true);
-            } else {
-                const error = await res.json();
-                alert(`Failed to check availability: ${error.error || 'Unknown error'}`);
-            }
-        } catch (err) {
-            console.error("Error checking availability:", err);
-            alert("Network error while checking availability");
-        }
-    };
+                <div className="bg-amber-50 rounded-xl p-4 mb-6 text-left border border-amber-200">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-amber-800 mb-1">Why is this happening?</p>
+                            <p className="text-amber-700">All blood centers must have their license verified before accessing the system.</p>
+                        </div>
+                    </div>
+                </div>
 
-    const executeRequest = async (requestId: number) => {
-        setExecutingRequestId(requestId);
-        try {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What happens next?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Admin will review your license document</li>
+                                <li>• You will receive an email notification once approved</li>
+                                <li>• After approval, you can view donations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
 
-            const res = await fetch(`http://localhost:8080/blood-requests/${requestId}/execute`, {
-                method: 'POST',
-                headers: headers
-            });
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} variant="outline" className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50">
+                        Back to Login
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white">
+                        Refresh Status
+                    </Button>
+                </div>
 
-            if (checkAuthAndRedirect(res)) return;
+                <p className="text-xs text-gray-400 mt-6">
+                    Need help? Contact support at support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
 
-            if (res.ok) {
-                const data = await res.json();
-                setSuccessData(data);
-                setShowSuccessModal(true);
-                setShowAvailabilityModal(false);
-                setTimeout(() => {
-                    refreshRequests();
-                }, 2000);
-            } else {
-                const error = await res.json();
-                alert(`Failed to execute: ${error.error || 'Unknown error'}`);
-            }
-        } catch (err) {
-            console.error("Error executing request:", err);
-            alert("Network error while executing request");
-        } finally {
-            setExecutingRequestId(null);
-        }
-    };
+    const renderRejectedVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <XCircle className="w-12 h-12 text-white" />
+                    </div>
+                </div>
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/auth/login';
-        }
-    }, []);
+                <h2 className="text-2xl font-bold text-red-800 mb-3">Account Not Verified</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-red-400 to-red-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account could not be verified by the administrator.
+                </p>
+
+                {rejectionReason && (
+                    <div className="bg-red-50 rounded-xl p-4 mb-6 text-left border border-red-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-semibold text-red-800 mb-1">Rejection Reason</p>
+                                <p className="text-red-700">{rejectionReason}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What can you do?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Contact support for more information</li>
+                                <li>• Correct any issues with your license document</li>
+                                <li>• Submit a new registration with updated documents</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white">
+                        Back to Login
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Contact support: support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+
+    if (verificationStatus === "PENDING") {
+        return renderPendingVerification();
+    }
+
+    if (verificationStatus === "REJECTED") {
+        return renderRejectedVerification();
+    }
 
     if (!userId) {
-        return <div className="flex"><BloodCenterSidebar userId={userId} /><main className="flex-1 p-6">Access Denied</main></div>;
+        return (
+            <div className="flex min-h-screen bg-background">
+                <BloodCenterSidebar userId={userId} />
+                <main className="flex-1 p-6">
+                    <Card className="p-6 text-center">
+                        <p className="text-destructive">Access Denied: User ID not found</p>
+                    </Card>
+                </main>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen bg-background">
+                <BloodCenterSidebar userId={userId} />
+                <main className="flex-1 p-6 flex items-center justify-center">
+                    <div className="text-center">
+                        <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-muted-foreground">Loading donations...</p>
+                    </div>
+                </main>
+            </div>
+        );
     }
 
     return (
@@ -271,11 +379,12 @@ export default function BloodRequestsPage() {
             <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen overflow-auto">
                 <header className="flex justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold">Blood Requests</h1>
-                        <p className="text-muted-foreground">Manage incoming requests from hospitals</p>
+                        <h1 className="text-3xl font-bold">Donations</h1>
+                        <p className="text-muted-foreground">Manage donations</p>
                     </div>
                     <CenterProfileCard userId={userId} />
                 </header>
+
 
                 {error && (
                     <Card className="p-4 mb-6 bg-red-50 border-red-200">
@@ -287,7 +396,20 @@ export default function BloodRequestsPage() {
                             onClick={() => {
                                 setError(null);
                                 if (bloodCenterId) {
-                                    refreshRequests();
+                                    const fetchDonations = async () => {
+                                        const headers = getAuthHeaders();
+                                        if (headers) {
+                                            const res = await fetch(`http://localhost:8080/donations/bloodcenter/${bloodCenterId}`, {
+                                                headers: headers
+                                            });
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                setDonations(data);
+                                                setFiltered(data);
+                                            }
+                                        }
+                                    };
+                                    fetchDonations();
                                 }
                             }}
                             className="mt-2 px-3 py-1 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
@@ -299,10 +421,10 @@ export default function BloodRequestsPage() {
 
                 <Card className="p-4 mb-6">
                     <div className="flex gap-4 flex-wrap">
-                        <div className="flex-1 relative">
+                        <div className="flex-1 min-w-64 relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search hospital, component or blood group..."
+                                placeholder="Search donor..."
                                 className="pl-10"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -313,26 +435,25 @@ export default function BloodRequestsPage() {
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">All Statuses</SelectItem>
-                                {Object.keys(statusColors).map(s => (
-                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                <SelectItem value="ALL">All</SelectItem>
+                                {Object.keys(statusLabels).map(s => (
+                                    <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
                 </Card>
 
-                {isLoading ? (
+                {filtered.length === 0 ? (
                     <Card className="p-12 text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                        <p className="mt-4 text-muted-foreground">Loading requests...</p>
-                    </Card>
-                ) : filtered.length === 0 ? (
-                    <Card className="p-12 text-center text-muted-foreground">
-                        <Droplet className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-semibold">No blood requests found</p>
-                        <p className="text-sm">When hospitals request blood, they will appear here</p>
-                        {(search || statusFilter !== "ALL") && (
+                        <Droplet className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold mb-2">No Donations Found</h3>
+                        <p className="text-muted-foreground">
+                            {donations.length === 0
+                                ? "No donations have been recorded yet"
+                                : "No donations match your search criteria"}
+                        </p>
+                        {donations.length > 0 && (search || statusFilter !== "ALL") && (
                             <button
                                 onClick={() => {
                                     setSearch("");
@@ -346,70 +467,35 @@ export default function BloodRequestsPage() {
                     </Card>
                 ) : (
                     <div className="space-y-4">
-                        {filtered.map(req => (
-                            <Card key={req.bloodRequestId} className="p-4 hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-start gap-4 flex-1">
-                                        <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                            <Droplet className="w-7 h-7 text-primary" />
+                        {filtered.map(d => (
+                            <Card key={d.donationId} className="p-4 hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <User className="w-6 h-6 text-primary" />
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                <h3 className="font-semibold text-lg">
-                                                    {req.bloodGroup}{req.rhesusFactor === "POSITIVE" ? "+" : req.rhesusFactor === "NEGATIVE" ? "-" : req.rhesusFactor} - {req.componentType}
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="font-semibold">
+                                                    {d.donor?.firstName} {d.donor?.lastName}
                                                 </h3>
-                                                <Badge variant="outline" className={statusColors[req.status]}>
-                                                    {req.status}
+                                                <Badge variant="outline" className={statusColors[d.status]}>
+                                                    {statusLabels[d.status] || d.status}
                                                 </Badge>
                                             </div>
-                                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
+                                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mt-1">
                                                 <span className="flex items-center gap-1">
-                                                    <Building2 className="w-4 h-4" />
-                                                    {req.medCenter?.name || "Unknown Hospital"}
+                                                    <Calendar className="w-4 h-4" />
+                                                    {formatDate(d.donationDate)}
                                                 </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="w-4 h-4" />
-                                                    {formatDeadline(req.deadline)}
-                                                </span>
-                                                <span>Volume: {req.volume}</span>
+                                                {d.analysis?.bloodGroup && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Droplet className="w-4 h-4 text-red-500" />
+                                                        {d.analysis.bloodGroup}{d.analysis.rhesusFactor}
+                                                    </span>
+                                                )}
                                             </div>
-                                            {req.comment && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    Note: {req.comment}
-                                                </p>
-                                            )}
                                         </div>
-                                    </div>
-                                    <div className="flex gap-2 ml-4">
-                                        {req.status === "PENDING" && (
-                                            <>
-                                                <button
-                                                    onClick={() => checkAvailability(req)}
-                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                                                >
-                                                    Check Availability
-                                                </button>
-                                                <button
-                                                    onClick={() => executeRequest(req.bloodRequestId)}
-                                                    disabled={executingRequestId === req.bloodRequestId}
-                                                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    {executingRequestId === req.bloodRequestId ? "Executing..." : "Execute"}
-                                                </button>
-                                            </>
-                                        )}
-                                        {req.status === "COMPLETED" && (
-                                            <div className="flex items-center gap-1 text-green-600">
-                                                <CheckCircle className="w-5 h-5" />
-                                                <span className="text-sm">Completed</span>
-                                            </div>
-                                        )}
-                                        {req.status === "REJECTED" && (
-                                            <div className="flex items-center gap-1 text-red-600">
-                                                <XCircle className="w-5 h-5" />
-                                                <span className="text-sm">Rejected</span>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </Card>
@@ -417,115 +503,6 @@ export default function BloodRequestsPage() {
                     </div>
                 )}
             </main>
-
-            {/* Модальное окно проверки доступности */}
-            {showAvailabilityModal && availabilityData && selectedRequest && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAvailabilityModal(false)}>
-                    <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <h2 className="text-xl font-bold mb-4">Blood Availability Check</h2>
-
-                        <div className="space-y-3 mb-6">
-                            <div className="flex justify-between pb-2 border-b">
-                                <span className="font-medium">Request:</span>
-                                <span>{selectedRequest.bloodGroup}{selectedRequest.rhesusFactor === "POSITIVE" ? "+" : "-"} - {selectedRequest.componentType}</span>
-                            </div>
-                            <div className="flex justify-between pb-2 border-b">
-                                <span className="font-medium">Requested Volume:</span>
-                                <span>{availabilityData.requestedVolume} ml</span>
-                            </div>
-                            <div className="flex justify-between pb-2 border-b">
-                                <span className="font-medium">Available Volume:</span>
-                                <span className={availabilityData.totalAvailable >= availabilityData.requestedVolume ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
-                                    {availabilityData.totalAvailable} ml
-                                </span>
-                            </div>
-                            <div className="flex justify-between pb-2 border-b">
-                                <span className="font-medium">Can Fulfill:</span>
-                                <span className={availabilityData.isFulfillable ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
-                                    {availabilityData.isFulfillable ? "Yes" : "No"}
-                                </span>
-                            </div>
-                            <div className="flex justify-between pb-2 border-b">
-                                <span className="font-medium">Available Units:</span>
-                                <span>{availabilityData.availableReservesCount}</span>
-                            </div>
-
-                            {availabilityData.reserves?.length > 0 && (
-                                <div className="mt-4">
-                                    <p className="font-medium mb-2">Available Reserves:</p>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                                        {availabilityData.reserves.map((reserve: any) => (
-                                            <div key={reserve.reserveId} className="text-sm p-2 bg-gray-50 rounded border">
-                                                <div className="flex justify-between">
-                                                    <span className="font-medium">Unit #{reserve.reserveId}:</span>
-                                                    <span>{reserve.quantity} ml</span>
-                                                </div>
-                                                <div className="text-gray-500 text-xs mt-1">
-                                                    Expires in: {reserve.daysUntilExpiration} days
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex gap-3">
-                            {availabilityData.isFulfillable && selectedRequest.status === "PENDING" && (
-                                <button
-                                    onClick={() => executeRequest(selectedRequest.bloodRequestId)}
-                                    disabled={executingRequestId === selectedRequest.bloodRequestId}
-                                    className="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
-                                >
-                                    {executingRequestId === selectedRequest.bloodRequestId ? "Executing..." : "Execute Request"}
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setShowAvailabilityModal(false)}
-                                className="flex-1 border py-2 rounded-md hover:bg-gray-50 transition-colors"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Модальное окно успешного выполнения */}
-            {showSuccessModal && successData && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSuccessModal(false)}>
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <CheckCircle className="w-8 h-8 text-green-600" />
-                            </div>
-                            <h2 className="text-xl font-bold mb-2">Request Executed Successfully!</h2>
-                            <p className="text-gray-600 mb-4">
-                                Blood has been allocated to the hospital.
-                            </p>
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
-                                <div className="flex justify-between mb-2">
-                                    <span className="font-medium">Fulfilled Volume:</span>
-                                    <span>{successData.fulfilledVolume} ml</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="font-medium">Reserves Used:</span>
-                                    <span>{successData.reservesUsed} unit(s)</span>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setShowSuccessModal(false);
-                                    refreshRequests();
-                                }}
-                                className="w-full bg-primary text-white py-2 rounded-md hover:bg-primary/90 transition-colors"
-                            >
-                                OK
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 }

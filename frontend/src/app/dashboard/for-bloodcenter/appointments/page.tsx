@@ -16,9 +16,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Calendar, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical, Database, Plus, Trash2, Eye } from "lucide-react";
+import { Search, Calendar, User, CheckCircle, XCircle, Clock, Droplet, Loader2, AlertTriangle, FlaskConical, Database, Plus, Trash2, Eye, Shield, Mail } from "lucide-react";
 
-//  ХЕЛПЕРЫ
+// ============== ХЕЛПЕРЫ ==============
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -63,7 +63,7 @@ const formatBloodType = (bloodGroup?: string, rhesusFactor?: string): string => 
     return `${bloodGroup}${rh}`;
 };
 
-//  КОНСТАНТЫ
+// ============== КОНСТАНТЫ ==============
 const statusColors: Record<string, string> = {
     SCHEDULED: "bg-secondary text-secondary-foreground",
     IN_PROGRESS: "bg-accent text-accent-foreground",
@@ -98,7 +98,6 @@ const componentColors: Record<string, string> = {
     CRYOPRECIPITATE: "bg-muted text-muted-foreground",
 };
 
-// Стандартные объемы для каждого компонента (мл)
 const getDefaultQuantity = (componentType: string): number => {
     switch (componentType) {
         case "WHOLE_BLOOD": return 450;
@@ -110,13 +109,7 @@ const getDefaultQuantity = (componentType: string): number => {
     }
 };
 
-// Стандартные дни карантина (только для плазмы)
-const getQuarantineDays = (componentType: string): number | null => {
-    if (componentType === "PLASMA") return 90;
-    return null;
-};
-
-//ИНТЕРФЕЙСЫ
+// ============== ИНТЕРФЕЙСЫ ==============
 interface Appointment {
     appointmentId: number;
     appointmentDate: string;
@@ -186,6 +179,8 @@ export default function AppointmentsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
     // Analysis состояния
     const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
@@ -223,9 +218,39 @@ export default function AppointmentsPage() {
     const [confirmAppointmentId, setConfirmAppointmentId] = useState<number | null>(null);
     const [confirmDonorName, setConfirmDonorName] = useState("");
 
+    // ============== ПРОВЕРКА ВЕРИФИКАЦИИ ==============
+    const checkVerification = useCallback(async () => {
+        if (!userId) return;
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, { headers });
+
+            if (response.status === 403) {
+                setVerificationStatus("PENDING");
+                setIsLoading(false);
+                return;
+            }
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/auth/login';
+                return;
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                setVerificationStatus(data.verificationStatus || "APPROVED");
+                setRejectionReason(data.rejectionReason || null);
+            }
+        } catch (error) {
+            console.error("Error checking verification:", error);
+        }
+    }, [userId]);
+
     // ============== API ВЫЗОВЫ ==============
     const fetchBloodCenterId = useCallback(async () => {
-        if (!userId) return;
+        if (!userId || verificationStatus !== "APPROVED") return;
         setError(null);
         try {
             const headers = getAuthHeaders();
@@ -241,10 +266,10 @@ export default function AppointmentsPage() {
         } catch (error) {
             setError(error instanceof Error ? error.message : "Failed to load blood center");
         }
-    }, [userId]);
+    }, [userId, verificationStatus]);
 
     const fetchAppointments = useCallback(async () => {
-        if (!bloodCenterId) return;
+        if (!bloodCenterId || verificationStatus !== "APPROVED") return;
         setIsLoading(true);
         setError(null);
 
@@ -279,7 +304,7 @@ export default function AppointmentsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [bloodCenterId]);
+    }, [bloodCenterId, verificationStatus]);
 
     const fetchAnalysis = async (donationId: number) => {
         try {
@@ -665,12 +690,20 @@ export default function AppointmentsPage() {
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/auth/login';
-        else fetchBloodCenterId();
-    }, [fetchBloodCenterId]);
+        else checkVerification();
+    }, [checkVerification]);
 
     useEffect(() => {
-        if (bloodCenterId) fetchAppointments();
-    }, [bloodCenterId, fetchAppointments]);
+        if (verificationStatus === "APPROVED") {
+            fetchBloodCenterId();
+        }
+    }, [verificationStatus, fetchBloodCenterId]);
+
+    useEffect(() => {
+        if (bloodCenterId && verificationStatus === "APPROVED") {
+            fetchAppointments();
+        }
+    }, [bloodCenterId, verificationStatus, fetchAppointments]);
 
     useEffect(() => {
         let result = [...appointments];
@@ -685,7 +718,130 @@ export default function AppointmentsPage() {
         setFilteredAppointments(result);
     }, [searchTerm, statusFilter, appointments]);
 
+    // ============== КОМПОНЕНТЫ ДЛЯ СТАТУСОВ ==============
+    const renderPendingVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <Clock className="w-12 h-12 text-white" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-amber-800 mb-3">Account Pending Verification</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account is awaiting approval from the administrator.
+                </p>
+
+                <div className="bg-amber-50 rounded-xl p-4 mb-6 text-left border border-amber-200">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-amber-800 mb-1">Why is this happening?</p>
+                            <p className="text-amber-700">All blood centers must have their license verified before accessing the system.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What happens next?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Admin will review your license document</li>
+                                <li>• You will receive an email notification once approved</li>
+                                <li>• After approval, you can manage appointments</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} variant="outline" className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50">
+                        Back to Login
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white">
+                        Refresh Status
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Need help? Contact support at support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+    const renderRejectedVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <XCircle className="w-12 h-12 text-white" />
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-red-800 mb-3">Account Not Verified</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-red-400 to-red-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account could not be verified by the administrator.
+                </p>
+
+                {rejectionReason && (
+                    <div className="bg-red-50 rounded-xl p-4 mb-6 text-left border border-red-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-semibold text-red-800 mb-1">Rejection Reason</p>
+                                <p className="text-red-700">{rejectionReason}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What can you do?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Contact support for more information</li>
+                                <li>• Correct any issues with your license document</li>
+                                <li>• Submit a new registration with updated documents</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white">
+                        Back to Login
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Contact support: support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
     // ============== РЕНДЕР ==============
+    if (verificationStatus === "PENDING") {
+        return renderPendingVerification();
+    }
+
+    if (verificationStatus === "REJECTED") {
+        return renderRejectedVerification();
+    }
+
     if (!userId) {
         return (
             <div className="flex min-h-screen bg-background">
@@ -703,7 +859,6 @@ export default function AppointmentsPage() {
         <>
             <BloodCenterSidebar userId={userId} />
             <main className="ml-20 lg:ml-64 p-6 lg:p-8 min-h-screen bg-background">
-                {/* Header */}
                 <header className="flex items-start justify-between mb-6">
                     <div>
                         <h1 className="text-3xl font-bold">Appointments</h1>
@@ -712,7 +867,7 @@ export default function AppointmentsPage() {
                     <CenterProfileCard userId={userId} />
                 </header>
 
-                {/* Error Alert */}
+
                 {error && (
                     <Card className="p-4 mb-5 bg-destructive/10 border-destructive/20">
                         <p className="text-destructive text-sm">{error}</p>
@@ -720,14 +875,11 @@ export default function AppointmentsPage() {
                     </Card>
                 )}
 
-                {/* Filters */}
                 <Card className="p-3 mb-5">
                     <div className="flex flex-wrap gap-3">
-                        <div className="flex-1 min-w-64">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input placeholder="Search by donor name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9 text-sm" disabled={isLoading} />
-                            </div>
+                        <div className="flex-1 min-w-64 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input placeholder="Search by donor name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9 text-sm" disabled={isLoading} />
                         </div>
                         <Select value={statusFilter} onValueChange={setStatusFilter} disabled={isLoading}>
                             <SelectTrigger className="w-48 h-9 text-sm"><SelectValue placeholder="Filter by status" /></SelectTrigger>
@@ -744,7 +896,6 @@ export default function AppointmentsPage() {
                     </div>
                 </Card>
 
-                {/* Appointments List */}
                 {filteredAppointments.length === 0 ? (
                     <Card className="p-12 text-center">
                         <p className="text-muted-foreground">No appointments found</p>
@@ -853,7 +1004,6 @@ export default function AppointmentsPage() {
                 )}
             </main>
 
-            {/* Analysis Dialog */}
             <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle className="flex items-center gap-2"><FlaskConical className="w-5 h-5 text-primary" /> Blood Analysis Results</DialogTitle></DialogHeader>
@@ -865,7 +1015,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">HIV</label>
                                     <Select value={analysisFormData.hiv} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hiv: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -876,7 +1026,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Brucellosis</label>
                                     <Select value={analysisFormData.brucellosis} onValueChange={(v) => setAnalysisFormData({...analysisFormData, brucellosis: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -887,7 +1037,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Hepatitis B</label>
                                     <Select value={analysisFormData.hepatitisB} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisB: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -898,7 +1048,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Hepatitis C</label>
                                     <Select value={analysisFormData.hepatitisC} onValueChange={(v) => setAnalysisFormData({...analysisFormData, hepatitisC: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -909,7 +1059,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Syphilis</label>
                                     <Select value={analysisFormData.syphilis} onValueChange={(v) => setAnalysisFormData({...analysisFormData, syphilis: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="NEGATIVE">Negative</SelectItem>
                                             <SelectItem value="POSITIVE">Positive</SelectItem>
                                             <SelectItem value="PENDING">Pending</SelectItem>
@@ -925,7 +1075,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Blood Group *</label>
                                     <Select value={analysisFormData.bloodGroup} onValueChange={(v) => setAnalysisFormData({...analysisFormData, bloodGroup: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select blood group" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="A">A</SelectItem>
                                             <SelectItem value="B">B</SelectItem>
                                             <SelectItem value="AB">AB</SelectItem>
@@ -937,7 +1087,7 @@ export default function AppointmentsPage() {
                                     <label className="text-xs text-muted-foreground">Rhesus Factor *</label>
                                     <Select value={analysisFormData.rhesusFactor} onValueChange={(v) => setAnalysisFormData({...analysisFormData, rhesusFactor: v})}>
                                         <SelectTrigger><SelectValue placeholder="Select rhesus factor" /></SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-card">
+                                        <SelectContent>
                                             <SelectItem value="POSITIVE">Positive (+)</SelectItem>
                                             <SelectItem value="NEGATIVE">Negative (-)</SelectItem>
                                         </SelectContent>
@@ -964,55 +1114,27 @@ export default function AppointmentsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Reserve Dialog */}
             <Dialog open={reserveDialogOpen} onOpenChange={setReserveDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Database className="w-5 h-5 text-primary" />
-                            Create Blood Components
-                        </DialogTitle>
-                    </DialogHeader>
-
+                    <DialogHeader><DialogTitle className="flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Create Blood Components</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-4">
-                        {/* Donor Info */}
                         <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
-                            <p className="text-sm text-primary">
-                                <strong>Donor Blood Type:</strong> {currentAnalysis?.bloodGroup}{currentAnalysis?.rhesusFactor === "POSITIVE" ? "+" : "-"}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Created date and expiration date will be calculated automatically
-                            </p>
+                            <p className="text-sm text-primary"><strong>Donor Blood Type:</strong> {currentAnalysis?.bloodGroup}{currentAnalysis?.rhesusFactor === "POSITIVE" ? "+" : "-"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Created date and expiration date will be calculated automatically</p>
                         </div>
-
-                        {/* Components List */}
                         <div className="space-y-4">
                             {reserveComponents.map((component, index) => (
                                 <Card key={component.id} className="p-4">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-semibold">Component #{index + 1}</h3>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeReserveComponent(component.id)}
-                                            className="text-destructive h-8 w-8 p-0"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => removeReserveComponent(component.id)} className="text-destructive h-8 w-8 p-0"><Trash2 className="w-4 h-4" /></Button>
                                     </div>
-
                                     <div className="grid grid-cols-2 gap-4">
-                                        {/* Component Type */}
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Component Type *</label>
-                                            <Select
-                                                value={component.componentType}
-                                                onValueChange={(value) => handleComponentTypeChange(component.id, value)}
-                                            >
-                                                <SelectTrigger className="bg-white dark:bg-card">
-                                                    <SelectValue placeholder="Select component type" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white dark:bg-card">
+                                            <Select value={component.componentType} onValueChange={(value) => handleComponentTypeChange(component.id, value)}>
+                                                <SelectTrigger><SelectValue placeholder="Select component type" /></SelectTrigger>
+                                                <SelectContent>
                                                     <SelectItem value="WHOLE_BLOOD">Whole Blood</SelectItem>
                                                     <SelectItem value="RED_BLOOD_CELLS">Red Blood Cells</SelectItem>
                                                     <SelectItem value="PLATELETS">Platelets</SelectItem>
@@ -1021,114 +1143,46 @@ export default function AppointmentsPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
-
-                                        {/* Quantity (ml) */}
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Quantity (ml) *</label>
-                                            <Input
-                                                type="number"
-                                                value={component.quantity}
-                                                onChange={(e) => updateReserveComponent(component.id, "quantity", parseInt(e.target.value) || 0)}
-                                                min="1"
-                                                placeholder="Enter quantity in ml"
-                                                className="bg-white dark:bg-card"
-                                            />
+                                            <Input type="number" value={component.quantity} onChange={(e) => updateReserveComponent(component.id, "quantity", parseInt(e.target.value) || 0)} min="1" placeholder="Enter quantity in ml" />
                                         </div>
                                     </div>
-
-                                    {/* Quarantine - только для плазмы */}
                                     {component.componentType === "PLASMA" && (
                                         <div className="mt-4 p-3 bg-muted/30 rounded-lg">
                                             <div className="flex items-center space-x-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id={`quarantine-${component.id}`}
-                                                    checked={component.inQuarantine}
-                                                    onChange={(e) => updateReserveComponent(component.id, "inQuarantine", e.target.checked)}
-                                                    className="w-4 h-4 rounded border-gray-300"
-                                                />
-                                                <label htmlFor={`quarantine-${component.id}`} className="text-sm font-medium">
-                                                    Place in quarantine (90 days required for plasma)
-                                                </label>
+                                                <input type="checkbox" id={`quarantine-${component.id}`} checked={component.inQuarantine} onChange={(e) => updateReserveComponent(component.id, "inQuarantine", e.target.checked)} className="w-4 h-4 rounded" />
+                                                <label htmlFor={`quarantine-${component.id}`} className="text-sm font-medium">Place in quarantine (90 days required for plasma)</label>
                                             </div>
-                                            {component.inQuarantine && (
-                                                <p className="text-xs text-muted-foreground mt-2 ml-6">
-                                                    Plasma requires 90 days quarantine period. Component will be available after {new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                                                </p>
-                                            )}
                                         </div>
                                     )}
-
-                                    {/* Info for other components */}
                                     {component.componentType !== "PLASMA" && (
-                                        <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                                <span className="text-sm text-green-700 dark:text-green-400">
-                                                    This component is ready for immediate use
-                                                </span>
-                                            </div>
+                                        <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                                            <div className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-600" /><span className="text-sm text-green-700">This component is ready for immediate use</span></div>
                                         </div>
                                     )}
-
-                                    {/* Notes */}
                                     <div className="mt-4">
                                         <label className="text-sm font-medium mb-1 block">Notes</label>
-                                        <textarea
-                                            className="w-full border rounded-md p-2 text-sm"
-                                            rows={2}
-                                            value={component.notes}
-                                            onChange={(e) => updateReserveComponent(component.id, "notes", e.target.value)}
-                                            placeholder={`Additional notes for ${componentLabels[component.componentType]}...`}
-                                        />
+                                        <textarea className="w-full border rounded-md p-2 text-sm" rows={2} value={component.notes} onChange={(e) => updateReserveComponent(component.id, "notes", e.target.value)} placeholder={`Additional notes...`} />
                                     </div>
                                 </Card>
                             ))}
                         </div>
-
-                        {/* Add Component Button */}
-                        <Button
-                            variant="outline"
-                            onClick={addReserveComponent}
-                            className="w-full border-dashed"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Component
-                        </Button>
-
-                        {/* Storage Information */}
+                        <Button variant="outline" onClick={addReserveComponent} className="w-full border-dashed"><Plus className="w-4 h-4 mr-2" /> Add Component</Button>
                         <div className="bg-muted/30 rounded-lg p-3">
-                            <p className="text-xs text-muted-foreground">
-                                <strong>Storage & Expiration:</strong><br/>
-                                • Whole Blood: 35 days at 2-6°C<br/>
-                                • Red Blood Cells: 42 days at 2-6°C<br/>
-                                • Platelets: 5 days at 20-24°C with agitation<br/>
-                                • Plasma: 3 years at -18°C (after 90-day quarantine)<br/>
-                                • Cryoprecipitate: 2 years at -18°C
-                            </p>
+                            <p className="text-xs text-muted-foreground"><strong>Storage & Expiration:</strong><br/>• Whole Blood: 35 days at 2-6°C<br/>• Red Blood Cells: 42 days at 2-6°C<br/>• Platelets: 5 days at 20-24°C with agitation<br/>• Plasma: 3 years at -18°C (after 90-day quarantine)<br/>• Cryoprecipitate: 2 years at -18°C</p>
                         </div>
                     </div>
-
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setReserveDialogOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSaveReserves}
-                            disabled={isCreatingReserve || reserveComponents.length === 0}
-                            className="bg-primary hover:bg-primary/90"
-                        >
-                            {isCreatingReserve ? (
-                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
-                            ) : (
-                                <>Create {reserveComponents.length} Component{reserveComponents.length !== 1 ? 's' : ''}</>
-                            )}
+                        <Button variant="outline" onClick={() => setReserveDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveReserves} disabled={isCreatingReserve || reserveComponents.length === 0} className="bg-primary hover:bg-primary/90">
+                            {isCreatingReserve ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : <>Create {reserveComponents.length} Component{reserveComponents.length !== 1 ? 's' : ''}</>}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* View Reserves Dialog */}
+
             <Dialog open={viewReservesDialogOpen} onOpenChange={setViewReservesDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle className="flex items-center gap-2"><Database className="w-5 h-5 text-primary" /> Blood Components</DialogTitle></DialogHeader>
@@ -1145,9 +1199,7 @@ export default function AppointmentsPage() {
                                             {reserve.quantity && <p className="text-xs text-muted-foreground">Quantity: {reserve.quantity} ml</p>}
                                         </div>
                                         <div className="flex gap-2">
-                                            <Badge className={reserve.isReady ? "bg-primary/10 text-primary" : reserve.inQuarantine ? "bg-accent/10 text-accent-foreground" : "bg-muted"}>
-                                                {reserve.isReady ? "Available" : reserve.inQuarantine ? "Quarantine" : "Processing"}
-                                            </Badge>
+                                            <Badge className={reserve.isReady ? "bg-primary/10 text-primary" : reserve.inQuarantine ? "bg-accent/10 text-accent-foreground" : "bg-muted"}>{reserve.isReady ? "Available" : reserve.inQuarantine ? "Quarantine" : "Processing"}</Badge>
                                             <Button variant="ghost" size="sm" onClick={() => handleDeleteReserve(reserve.reserveId)} disabled={deletingReserveId === reserve.reserveId} className="text-destructive h-8 w-8 p-0">
                                                 {deletingReserveId === reserve.reserveId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                             </Button>
@@ -1167,7 +1219,7 @@ export default function AppointmentsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Confirm Dialog */}
+
             <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-destructive" /> Confirm Donation</DialogTitle></DialogHeader>

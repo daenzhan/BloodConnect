@@ -198,7 +198,7 @@ public class AnalysisController {
         }
     }
 
-    @GetMapping("/donor/by-user/{userId}/ai-recommendation")
+    @GetMapping("/by-user/{userId}/ai-recommendation")
     public ResponseEntity<?> getAiRecommendationByUserId(@PathVariable Long userId) {
         try {
             Optional<Donor> donorOpt = donorRepository.findByUser_UserId(userId);
@@ -212,6 +212,7 @@ public class AnalysisController {
             Long donorId = donor.getDonorId();
 
             Optional<Analysis> lastAnalysis = analysisRepository.findLatestByDonorId(donorId);
+
             AiRecommendationRequest request = new AiRecommendationRequest();
             request.setAge(calculateAge(donor.getBirthDate()));
             request.setGender(donor.getGender().equals("MALE") ? 1 : 0);
@@ -244,17 +245,16 @@ public class AnalysisController {
             response.put("confidence", aiResponse.getConfidence());
             response.put("bmi", calculateBMI(donor.getWeight(), donor.getHeight()));
             response.put("bmiCategory", aiResponse.getBmiCategory());
-            response.put("donorId", donorId);
             response.put("userId", userId);
+            response.put("donorId", donorId);
 
             return ResponseEntity.ok(response);
-
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/donor/by-user/{userId}/latest")
+    @GetMapping("/by-user/{userId}/latest")
     public ResponseEntity<?> getLatestAnalysisByUserId(@PathVariable Long userId) {
         try {
             Optional<Donor> donorOpt = donorRepository.findByUser_UserId(userId);
@@ -289,28 +289,12 @@ public class AnalysisController {
             response.put("hemoglobin", analysis.getHemoglobin());
             response.put("technicianNotes", analysis.getTechnicianNotes());
             response.put("analysisDate", analysis.getAnalysisDate());
-            response.put("donationId", analysis.getDonation().getDonationId());
-            response.put("bloodCenterId", analysis.getBloodCenter().getBloodCenterId());
             response.put("isComplete", analysis.isComplete());
             response.put("isDonorEligible", analysis.isComplete() ? analysis.isDonorEligible() : false);
-            response.put("donorId", donorId);
             response.put("userId", userId);
+            response.put("donorId", donorId);
 
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @Deprecated
-    @GetMapping("/donor/{donorId}/ai-recommendation")
-    public ResponseEntity<?> getAiRecommendation(@PathVariable Long donorId) {
-        try {
-            Optional<Donor> donorOpt = donorRepository.findById(donorId);
-            if (donorOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-            return getAiRecommendationByUserId(donorOpt.get().getUser().getUserId());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
@@ -330,6 +314,21 @@ public class AnalysisController {
         }
     }
 
+    @Deprecated
+    @GetMapping("/donor/{donorId}/ai-recommendation")
+    public ResponseEntity<?> getAiRecommendationByDonorId(@PathVariable Long donorId) {
+        try {
+            Optional<Donor> donorOpt = donorRepository.findById(donorId);
+            if (donorOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return getAiRecommendationByUserId(donorOpt.get().getUser().getUserId());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+
     private int calculateAge(LocalDate birthDate) {
         return Period.between(birthDate, LocalDate.now()).getYears();
     }
@@ -341,7 +340,6 @@ public class AnalysisController {
 
     private Integer calculateAvgInterval(Donor donor) {
         try {
-            // Добавьте этот метод в DonationRepository
             List<Donation> donations = donationRepository.findByDonor_DonorIdOrderByDonationDateAsc(donor.getDonorId());
             if (donations == null || donations.size() < 2) {
                 return null;

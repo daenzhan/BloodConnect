@@ -4,9 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @RestController
 @RequestMapping("/medcenter")
@@ -95,5 +93,20 @@ public class MedCenterController {
         response.put("verifiedAt", center.getVerifiedAt());
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/debug/all")
+    public ResponseEntity<?> debugAllMedCenters() {
+        List<MedCenter> all = medCenterRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (MedCenter mc : all) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("medCenterId", mc.getMedCenterId());
+            item.put("name", mc.getName());
+            item.put("licenseFile", mc.getLicenseFile());
+            item.put("userId", mc.getUser().getUserId());
+            result.add(item);
+        }
+        return ResponseEntity.ok(result);
     }
 }

@@ -7,8 +7,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/files")
@@ -63,5 +68,27 @@ public class FileUploadController {
             return "image/png";
         }
         return "application/octet-stream";
+    }
+
+    @GetMapping("/debug/list")
+    public ResponseEntity<?> listUploadedFiles() {
+        try {
+            Path uploadPath = Paths.get("./uploads");
+            if (!Files.exists(uploadPath)) {
+                return ResponseEntity.ok(Map.of("files", List.of(), "path", uploadPath.toAbsolutePath().toString()));
+            }
+
+            List<String> files = Files.list(uploadPath)
+                    .map(path -> path.getFileName().toString())
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(Map.of(
+                    "files", files,
+                    "path", uploadPath.toAbsolutePath().toString(),
+                    "count", files.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -75,11 +75,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/home", "/").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/blood-centers/*/license").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/medcenter/*/license").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/files/upload/license").permitAll()
 
                         // DONOR ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.GET, "/donor/dashboard/**").hasRole("DONOR")
                         .requestMatchers(HttpMethod.GET, "/donor/top-donors").permitAll()
                         .requestMatchers(HttpMethod.GET, "/donor/current-donor-rank/**").hasRole("DONOR")
+                        .requestMatchers(HttpMethod.GET, "/analyses/by-user/**").hasRole("DONOR")
+                        .requestMatchers(HttpMethod.GET, "/analyses/by-user/{userId}/latest").hasRole("DONOR")
+                        .requestMatchers(HttpMethod.GET, "/analyses/by-user/{userId}/ai-recommendation").hasRole("DONOR")
+                        .requestMatchers(HttpMethod.GET, "/donor/user/**").hasRole("DONOR")
 
                         // BLOOD CENTER ЭНДПОИНТЫ
                         .requestMatchers(HttpMethod.GET, "/blood-centers").permitAll()

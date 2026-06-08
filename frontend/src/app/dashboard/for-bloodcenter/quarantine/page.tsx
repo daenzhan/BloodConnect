@@ -43,7 +43,8 @@ import {
     Users,
     Package,
     FlaskConical,
-    Loader2
+    Loader2,
+    Mail
 } from "lucide-react";
 
 const getAuthHeaders = () => {
@@ -87,12 +88,14 @@ export default function QuarantinePage() {
     const [quarantineItems, setQuarantineItems] = useState<QuarantineReserve[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
-    // Release dialog
+
     const [selectedItem, setSelectedItem] = useState<QuarantineReserve | null>(null);
     const [isReleaseDialogOpen, setIsReleaseDialogOpen] = useState(false);
 
-    // Plasma suitability dialog
+
     const [isSuitabilityDialogOpen, setIsSuitabilityDialogOpen] = useState(false);
     const [suitabilityData, setSuitabilityData] = useState({
         isSuitable: "",
@@ -101,9 +104,52 @@ export default function QuarantinePage() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+
+    const checkVerification = async () => {
+        if (!userId) return;
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) {
+                window.location.href = '/auth/login';
+                return;
+            }
+            const response = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, { headers });
+
+            if (response.status === 403) {
+                setVerificationStatus("PENDING");
+                setIsLoading(false);
+                return;
+            }
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/auth/login';
+                return;
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                setVerificationStatus(data.verificationStatus || "APPROVED");
+                setRejectionReason(data.rejectionReason || null);
+            }
+        } catch (err) {
+            console.error("Error checking verification:", err);
+        }
+    };
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth/login';
+            return;
+        }
+        checkVerification();
+    }, [userId]);
+
+
     useEffect(() => {
         const fetchCenter = async () => {
-            if (!userId) return;
+            if (!userId || verificationStatus !== "APPROVED") return;
             try {
                 const headers = getAuthHeaders();
                 if (!headers) {
@@ -126,10 +172,10 @@ export default function QuarantinePage() {
             }
         };
         fetchCenter();
-    }, [userId]);
+    }, [userId, verificationStatus]);
 
     const fetchQuarantineItems = async () => {
-        if (!bloodCenterId) return;
+        if (!bloodCenterId || verificationStatus !== "APPROVED") return;
         try {
             setIsLoading(true);
             const headers = getAuthHeaders();
@@ -156,13 +202,19 @@ export default function QuarantinePage() {
     };
 
     useEffect(() => {
-        fetchQuarantineItems();
-    }, [bloodCenterId]);
+        if (verificationStatus === "APPROVED") {
+            fetchQuarantineItems();
+        }
+    }, [bloodCenterId, verificationStatus]);
 
     const handleReleaseFromQuarantine = async (item: QuarantineReserve) => {
+        if (verificationStatus !== "APPROVED") {
+            setError("Account not verified");
+            return;
+        }
+
         setSelectedItem(item);
 
-        // If plasma, show suitability dialog after release
         if (item.componentType === "PLASMA") {
             setIsReleaseDialogOpen(false);
 
@@ -201,7 +253,7 @@ export default function QuarantinePage() {
     };
 
     const confirmRelease = async () => {
-        if (!selectedItem) return;
+        if (!selectedItem || verificationStatus !== "APPROVED") return;
 
         try {
             const headers = getAuthHeaders();
@@ -229,7 +281,7 @@ export default function QuarantinePage() {
     };
 
     const confirmPlasmaSuitability = async () => {
-        if (!suitabilityData.isSuitable) {
+        if (!suitabilityData.isSuitable || verificationStatus !== "APPROVED") {
             alert("Please select whether the plasma is suitable or not");
             return;
         }
@@ -289,6 +341,128 @@ export default function QuarantinePage() {
         return `${daysRemaining} days remaining`;
     };
 
+    const renderPendingVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-amber-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <Clock className="w-12 h-12 text-white" />
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-xs font-bold">!</span>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-amber-800 mb-3">Account Pending Verification</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account is awaiting approval from the administrator.
+                </p>
+
+                <div className="bg-amber-50 rounded-xl p-4 mb-6 text-left border border-amber-200">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-amber-800 mb-1">Why is this happening?</p>
+                            <p className="text-amber-700">All blood centers must have their license verified before accessing the system.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What happens next?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Admin will review your license document</li>
+                                <li>• You will receive an email notification once approved</li>
+                                <li>• After approval, you can manage quarantine</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} variant="outline" className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50">
+                        Back to Login
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white">
+                        Refresh Status
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Need help? Contact support at support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+    const renderRejectedVerification = () => (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100/30 p-4">
+            <Card className="max-w-md w-full p-8 text-center shadow-xl border-0 bg-white">
+                <div className="relative">
+                    <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <XCircle className="w-12 h-12 text-white" />
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-red-800 mb-3">Account Not Verified</h2>
+                <div className="h-1 w-20 bg-gradient-to-r from-red-400 to-red-600 rounded-full mx-auto mb-6"></div>
+
+                <p className="text-gray-600 mb-6">
+                    Your blood center account could not be verified by the administrator.
+                </p>
+
+                {rejectionReason && (
+                    <div className="bg-red-50 rounded-xl p-4 mb-6 text-left border border-red-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-semibold text-red-800 mb-1">Rejection Reason</p>
+                                <p className="text-red-700">{rejectionReason}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-semibold text-gray-700 mb-1">What can you do?</p>
+                            <ul className="text-gray-600 space-y-1">
+                                <li>• Contact support for more information</li>
+                                <li>• Correct any issues with your license document</li>
+                                <li>• Submit a new registration with updated documents</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    <Button onClick={() => window.location.href = '/auth/login'} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white">
+                        Back to Login
+                    </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-6">
+                    Contact support: support@bloodconnect.com
+                </p>
+            </Card>
+        </div>
+    );
+
+    if (verificationStatus === "PENDING") {
+        return renderPendingVerification();
+    }
+
+    if (verificationStatus === "REJECTED") {
+        return renderRejectedVerification();
+    }
+
     if (!userId) {
         return (
             <div className="flex min-h-screen bg-background">
@@ -317,7 +491,9 @@ export default function QuarantinePage() {
                     </div>
                 </div>
 
-                {/* Info Banner for Plasma */}
+
+
+
                 <Card className="p-4 mb-6 bg-blue-50 border-blue-200">
                     <div className="flex items-start gap-3">
                         <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -409,7 +585,7 @@ export default function QuarantinePage() {
                                                 </div>
                                                 {item.notes && (
                                                     <p className="text-xs text-muted-foreground mt-2">
-                                                        📝 {item.notes}
+                                                         {item.notes}
                                                     </p>
                                                 )}
                                             </div>
@@ -436,7 +612,7 @@ export default function QuarantinePage() {
                     </div>
                 )}
 
-                {/* Auto-release info */}
+
                 {quarantineItems.length > 0 && (
                     <Card className="p-4 mt-6 bg-gray-50 border-gray-200">
                         <div className="flex items-start gap-3">
@@ -453,7 +629,6 @@ export default function QuarantinePage() {
                 )}
             </main>
 
-            {/* Release Confirmation Dialog */}
             <AlertDialog open={isReleaseDialogOpen} onOpenChange={setIsReleaseDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -463,7 +638,7 @@ export default function QuarantinePage() {
                             {selectedItem?.componentType === "PLASMA" && (
                                 <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                                     <p className="text-sm text-yellow-800">
-                                        ⚠️ <strong>Plasma requires testing</strong> - After release, you will need to
+                                         <strong>Plasma requires testing</strong> - After release, you will need to
                                         confirm plasma suitability before it becomes available for use.
                                     </p>
                                 </div>
@@ -479,7 +654,7 @@ export default function QuarantinePage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Plasma Suitability Dialog */}
+
             <Dialog open={isSuitabilityDialogOpen} onOpenChange={setIsSuitabilityDialogOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
@@ -494,7 +669,7 @@ export default function QuarantinePage() {
 
                     <div className="space-y-6 py-4">
                         <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-sm text-blue-800 font-medium mb-2">📋 Pre-release Testing Required</p>
+                            <p className="text-sm text-blue-800 font-medium mb-2"> Pre-release Testing Required</p>
                             <p className="text-sm text-blue-700">
                                 Before plasma can be released for use, please confirm that the donor has passed
                                 follow-up testing and the plasma unit meets all quality standards. This ensures
@@ -502,7 +677,7 @@ export default function QuarantinePage() {
                             </p>
                         </div>
 
-                        {/* Radio buttons without shadcn/ui radio-group */}
+
                         <div className="space-y-3">
                             <Label className="text-base font-semibold">Is the plasma suitable for use?</Label>
                             <div className="flex gap-6">
@@ -514,7 +689,7 @@ export default function QuarantinePage() {
                                         onChange={(e) => setSuitabilityData({...suitabilityData, isSuitable: e.target.value})}
                                         className="w-4 h-4 text-green-600 focus:ring-green-500"
                                     />
-                                    <span className="text-green-700 font-medium">✅ Yes, suitable</span>
+                                    <span className="text-green-700 font-medium"> Yes, suitable</span>
                                 </label>
                                 <label className="flex items-center space-x-2 cursor-pointer">
                                     <input
@@ -524,7 +699,7 @@ export default function QuarantinePage() {
                                         onChange={(e) => setSuitabilityData({...suitabilityData, isSuitable: e.target.value})}
                                         className="w-4 h-4 text-red-600 focus:ring-red-500"
                                     />
-                                    <span className="text-red-700 font-medium">❌ No, not suitable</span>
+                                    <span className="text-red-700 font-medium"> No, not suitable</span>
                                 </label>
                             </div>
                         </div>
@@ -539,7 +714,7 @@ export default function QuarantinePage() {
                                     rows={3}
                                 />
                                 <p className="text-xs text-green-600">
-                                    ✅ After confirmation, this plasma will become AVAILABLE for use.
+                                     After confirmation, this plasma will become AVAILABLE for use.
                                 </p>
                             </div>
                         )}
@@ -555,7 +730,7 @@ export default function QuarantinePage() {
                                     required
                                 />
                                 <p className="text-xs text-red-600">
-                                    ⚠️ Marking as unsuitable will remove this plasma from inventory.
+                                    ⚠ Marking as unsuitable will remove this plasma from inventory.
                                 </p>
                             </div>
                         )}
@@ -573,7 +748,7 @@ export default function QuarantinePage() {
                         {suitabilityData.isSuitable === "NO" && (
                             <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                                 <p className="text-sm text-red-800">
-                                    ⚠️ <strong>Important:</strong> Marking plasma as unsuitable will remove it from
+                                     <strong>Important:</strong> Marking plasma as unsuitable will remove it from
                                     inventory and flag it for proper disposal. This action cannot be undone.
                                 </p>
                             </div>

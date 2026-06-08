@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Building2, LogOut, MapPin, CalendarPlus } from "lucide-react";
+import { ChevronDown, Building2, LogOut, MapPin, CalendarPlus, Shield, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -12,7 +12,7 @@ interface CenterProfileProps {
 
 export function CenterProfileCard({ userId }: CenterProfileProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [centerData, setCenterData] = useState<{ name: string; city: string; location?: string } | null>(null);
+    const [centerData, setCenterData] = useState<{ name: string; city: string; location?: string; verificationStatus?: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
@@ -39,7 +39,6 @@ export function CenterProfileCard({ userId }: CenterProfileProps) {
                     return;
                 }
 
-                // Сначала получаем bloodCenterId по userId
                 const centerRes = await fetch(`http://localhost:8080/blood-centers/by-user/${userId}`, {
                     headers: headers
                 });
@@ -49,7 +48,8 @@ export function CenterProfileCard({ userId }: CenterProfileProps) {
                     setCenterData({
                         name: centerInfo.name || "Blood Center",
                         city: centerInfo.city || "City",
-                        location: centerInfo.location
+                        location: centerInfo.location,
+                        verificationStatus: centerInfo.verificationStatus
                     });
                 }
             } catch (error) {
@@ -66,7 +66,15 @@ export function CenterProfileCard({ userId }: CenterProfileProps) {
         ? centerData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
         : "BC";
 
-    const getAvatarColor = () => 'bg-gradient-to-br from-primary to-primary/80';
+    const getAvatarColor = () => {
+        if (centerData?.verificationStatus === "PENDING") {
+            return "bg-gradient-to-br from-amber-500 to-amber-600";
+        }
+        if (centerData?.verificationStatus === "REJECTED") {
+            return "bg-gradient-to-br from-red-500 to-red-600";
+        }
+        return "bg-gradient-to-br from-primary to-primary/80";
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('user');
@@ -102,6 +110,15 @@ export function CenterProfileCard({ userId }: CenterProfileProps) {
                         <p className="text-sm font-medium text-gray-900">{centerData?.name || "Blood Center"}</p>
                         <div className="flex items-center gap-2 text-xs">
                             <span className="text-gray-600">{centerData?.city || "City"}</span>
+                            {centerData?.verificationStatus === "PENDING" && (
+                                <span className="text-amber-600 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Pending
+                                </span>
+                            )}
+                            {centerData?.verificationStatus === "APPROVED" && (
+                                <span className="text-green-600"> Verified</span>
+                            )}
                         </div>
                     </div>
 
@@ -122,46 +139,64 @@ export function CenterProfileCard({ userId }: CenterProfileProps) {
                         </div>
 
                         <div className="px-3 py-1 mb-1">
-                            <span className="text-xs px-2 py-1 rounded-full border-0 text-white bg-gradient-to-br from-primary to-primary/80">
-                                Blood Center
-                            </span>
+                            {centerData?.verificationStatus === "PENDING" ? (
+                                <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                                     Pending Verification
+                                </span>
+                            ) : centerData?.verificationStatus === "APPROVED" ? (
+                                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                     Verified
+                                </span>
+                            ) : (
+                                <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
+                                     Not Verified
+                                </span>
+                            )}
                         </div>
 
-                        <div className="space-y-1">
-                            <button
-                                onClick={() => router.push(`/dashboard/for-bloodcenter?userId=${userId}`)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
-                            >
-                                <Building2 className="w-4 h-4" />
-                                Dashboard
-                            </button>
+                        {centerData?.verificationStatus === "APPROVED" && (
+                            <div className="space-y-1">
+                                <button
+                                    onClick={() => router.push(`/dashboard/for-bloodcenter?userId=${userId}`)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                                >
+                                    <Building2 className="w-4 h-4" />
+                                    Dashboard
+                                </button>
 
-                            <button
-                                onClick={() => router.push(`/dashboard/for-bloodcenter/reserve?userId=${userId}`)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
-                            >
-                                <Building2 className="w-4 h-4" />
-                                Blood Reserve
-                            </button>
+                                <button
+                                    onClick={() => router.push(`/dashboard/for-bloodcenter/reserve?userId=${userId}`)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                                >
+                                    <Building2 className="w-4 h-4" />
+                                    Blood Reserve
+                                </button>
 
-                            <button
-                                onClick={() => router.push(`/dashboard/for-bloodcenter/requests?userId=${userId}`)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
-                            >
-                                <Building2 className="w-4 h-4" />
-                                Blood Requests
-                            </button>
+                                <button
+                                    onClick={() => router.push(`/dashboard/for-bloodcenter/requests?userId=${userId}`)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                                >
+                                    <Building2 className="w-4 h-4" />
+                                    Blood Requests
+                                </button>
+                            </div>
+                        )}
 
-                            <hr className="my-1 border-gray-200" />
+                        {centerData?.verificationStatus === "PENDING" && (
+                            <div className="px-3 py-2 text-sm text-amber-600 bg-amber-50 rounded-lg mb-2">
+                                <p className="text-xs">Account pending verification. Contact admin for more information.</p>
+                            </div>
+                        )}
 
-                            <button
-                                onClick={handleLogout}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-red-600"
-                            >
-                                <LogOut className="w-4 h-4" />
-                                Logout
-                            </button>
-                        </div>
+                        <hr className="my-1 border-gray-200" />
+
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors text-red-600"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Logout
+                        </button>
                     </Card>
                 )}
             </div>

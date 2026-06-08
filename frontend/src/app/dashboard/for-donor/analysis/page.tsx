@@ -120,16 +120,17 @@ function AnalysisContent() {
             if (!donorResponse.ok) throw new Error("Failed to fetch donor data");
             const donorData = await donorResponse.json();
 
-            let donorIdValue = donorData.donorId;
-            if (!donorIdValue) {
-                const donorByIdResponse = await fetch(`http://localhost:8080/donor/user/${userId}`, {
-                    headers: headers
-                });
-                if (donorByIdResponse.ok) {
-                    const donorByIdData = await donorByIdResponse.json();
-                    donorIdValue = donorByIdData.donorId;
-                }
-            }
+            const donorIdValue = donorData.donorId;
+            // let donorIdValue = donorData.donorId;
+            // if (!donorIdValue) {
+            //     const donorByIdResponse = await fetch(`http://localhost:8080/donor/user/${userId}`, {
+            //         headers: headers
+            //     });
+            //     if (donorByIdResponse.ok) {
+            //         const donorByIdData = await donorByIdResponse.json();
+            //         donorIdValue = donorByIdData.donorId;
+            //     }
+            // }
 
             if (!donorIdValue) {
                 setError("Donor ID not found");
@@ -139,7 +140,7 @@ function AnalysisContent() {
 
             setDonorId(donorIdValue);
 
-            const analysisResponse = await fetch(`http://localhost:8080/analyses/donor/by-user/${userId}/latest`, {
+            const analysisResponse = await fetch(`http://localhost:8080/analyses/by-user/${userId}/latest`, {
                 headers: headers
             });
 
@@ -168,7 +169,7 @@ function AnalysisContent() {
             const headers = getAuthHeaders();
             if (!headers) return;
 
-            const response = await fetch(`http://localhost:8080/analyses/donor/by-user/${userId}/ai-recommendation`, {
+            const response = await fetch(`http://localhost:8080/analyses/by-user/${userId}/ai-recommendation`, {
                 headers: headers
             });
 
