@@ -59,42 +59,6 @@ public class AppointmentService {
         return appointmentRepository.save(appointment);
     }
 
-    // Старт записи - создаем донацию И анализ
-    @Transactional
-    public Appointment startAppointment(Long appointmentId) {
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
-
-        if (!"SCHEDULED".equals(appointment.getStatus())) {
-            throw new IllegalStateException("Cannot start appointment with status: " + appointment.getStatus());
-        }
-
-        // Создаем донацию
-        Donation donation = new Donation();
-        donation.setDonor(appointment.getDonor());
-        donation.setBloodCenter(appointment.getBloodCenter());
-        donation.setAppointment(appointment);
-        donation.setDonationDate(LocalDateTime.now());
-        donation.setStatus("IN_PROGRESS");
-        donation.setHasAnalysis(true); // Теперь будет анализ
-
-        Donation savedDonation = donationRepository.save(donation);
-        appointment.setDonation(savedDonation);
-        appointment.setStatus("IN_PROGRESS");
-
-        Appointment savedAppointment = appointmentRepository.save(appointment);
-
-        // СОЗДАЕМ АНАЛИЗ для этой донации
-        Analysis analysis = new Analysis();
-        analysis.setDonation(savedDonation);
-        analysis.setBloodCenter(appointment.getBloodCenter());
-        analysis.setStatus("PENDING");
-        analysis.setAnalysisDate(LocalDateTime.now());
-        analysisRepository.save(analysis);
-
-        return savedAppointment;
-    }
-
     // Завершение донации
     @Transactional
     public Appointment completeDonation(Long appointmentId) {
@@ -155,5 +119,66 @@ public class AppointmentService {
 
     public List<Appointment> getUpcomingAppointments(Long donorId) {
         return appointmentRepository.findUpcomingAppointments(donorId, LocalDateTime.now());
+    }
+
+    @Transactional
+    public Appointment startAppointment(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+
+        System.out.println("=== START APPOINTMENT DEBUG ===");
+        System.out.println("Appointment ID: " + appointmentId);
+        System.out.println("Current status: " + appointment.getStatus());
+        System.out.println("Donor ID: " + (appointment.getDonor() != null ? appointment.getDonor().getDonorId() : "null"));
+        System.out.println("Blood Center ID: " + (appointment.getBloodCenter() != null ? appointment.getBloodCenter().getBloodCenterId() : "null"));
+
+        if (!"SCHEDULED".equals(appointment.getStatus())) {
+            throw new IllegalStateException("Cannot start appointment with status: " + appointment.getStatus() +
+                    ". Expected status: SCHEDULED");
+        }
+
+        // Проверяем, что донор существует
+        if (appointment.getDonor() == null) {
+            throw new IllegalStateException("Appointment has no donor assigned");
+        }
+
+        // Проверяем, что центр крови существует
+        if (appointment.getBloodCenter() == null) {
+            throw new IllegalStateException("Appointment has no blood center assigned");
+        }
+
+        // Проверяем, не создана ли уже донация
+        if (appointment.getDonation() != null) {
+            throw new IllegalStateException("Donation already exists for this appointment");
+        }
+
+        // Создаем донацию
+        Donation donation = new Donation();
+        donation.setDonor(appointment.getDonor());
+        donation.setBloodCenter(appointment.getBloodCenter());
+        donation.setAppointment(appointment);
+        donation.setDonationDate(LocalDateTime.now());
+        donation.setStatus("IN_PROGRESS");
+        donation.setHasAnalysis(true);
+
+        Donation savedDonation = donationRepository.save(donation);
+        System.out.println("Donation created with ID: " + savedDonation.getDonationId());
+
+        appointment.setDonation(savedDonation);
+        appointment.setStatus("IN_PROGRESS");
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        System.out.println("Appointment status updated to: IN_PROGRESS");
+
+        // СОЗДАЕМ АНАЛИЗ для этой донации
+        Analysis analysis = new Analysis();
+        analysis.setDonation(savedDonation);
+        analysis.setBloodCenter(appointment.getBloodCenter());
+        analysis.setStatus("PENDING");
+        analysis.setAnalysisDate(LocalDateTime.now());
+        analysisRepository.save(analysis);
+        System.out.println("Analysis created for donation: " + savedDonation.getDonationId());
+
+        return savedAppointment;
     }
 }

@@ -109,8 +109,13 @@ public class AppointmentController {
                     "status", appointment.getStatus(),
                     "donationId", appointment.getDonation() != null ? appointment.getDonation().getDonationId() : null
             ));
-        } catch (Exception e) {
+        } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", "Internal server error: " + e.getMessage()));
         }
     }
 

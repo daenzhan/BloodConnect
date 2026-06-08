@@ -222,7 +222,8 @@ public class AnalysisController {
 
             if (lastAnalysis.isPresent()) {
                 Analysis analysis = lastAnalysis.get();
-                request.setHemoglobin(analysis.getHemoglobin() != null ? analysis.getHemoglobin() : 0);
+                // Analysis stores hemoglobin in g/L; the AI service expects g/dL
+                request.setHemoglobin(analysis.getHemoglobin() != null ? analysis.getHemoglobin() / 10.0 : 0);
                 request.setFerritin(null);
             } else {
                 request.setHemoglobin(0);
@@ -240,8 +241,8 @@ public class AnalysisController {
             response.put("nextDonationDays", aiResponse.getNextDonationDays());
             response.put("readySoon", aiResponse.isReadySoon());
             response.put("readinessLevel", aiResponse.getReadinessLevel());
-            response.put("readinessText", aiResponse.getReadinessText());
-            response.put("healthAdvice", aiResponse.getHealthAdvice());
+            response.put("readinessText", trimToNull(aiResponse.getReadinessText()));
+            response.put("healthAdvice", trimToNull(aiResponse.getHealthAdvice()));
             response.put("confidence", aiResponse.getConfidence());
             response.put("bmi", calculateBMI(donor.getWeight(), donor.getHeight()));
             response.put("bmiCategory", aiResponse.getBmiCategory());
@@ -328,6 +329,14 @@ public class AnalysisController {
         }
     }
 
+
+    // AI service messages are built by concatenating blocks that each carry a leading space
+    // (stripped emoji prefixes), leaving stray leading/double spaces - normalize to single spaces
+    private String trimToNull(String text) {
+        if (text == null) return null;
+        String cleaned = text.trim().replaceAll("\\s+", " ");
+        return cleaned.isEmpty() ? null : cleaned;
+    }
 
     private int calculateAge(LocalDate birthDate) {
         return Period.between(birthDate, LocalDate.now()).getYears();

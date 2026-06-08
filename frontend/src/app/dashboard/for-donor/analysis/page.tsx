@@ -75,6 +75,12 @@ const getStatusColor = (status: string) => {
     }
 };
 
+const splitAdvice = (advice: string | null | undefined): string[] => {
+    if (!advice) return [];
+    return advice.split('. ').map(s => s.trim()).filter(Boolean)
+                 .map(s => s.endsWith('.') ? s : s + '.');
+};
+
 const getReadinessColor = (level: string) => {
     switch(level) {
         case 'green': return "bg-green-100 text-green-700 border-green-200";
@@ -300,7 +306,14 @@ function AnalysisContent() {
                                         {aiRecommendation.readinessText}
                                     </Badge>
                                 </div>
-                                <p className="text-purple-700 mt-2">{aiRecommendation.healthAdvice}</p>
+                                <ul className="mt-2 space-y-1">
+                                    {splitAdvice(aiRecommendation.healthAdvice).map((tip, i) => (
+                                        <li key={i} className="flex items-start gap-2 text-purple-700 text-sm">
+                                            <span className="mt-1 shrink-0">•</span>
+                                            <span>{tip}</span>
+                                        </li>
+                                    ))}
+                                </ul>
 
                                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <div className="bg-white/50 rounded-lg p-3 text-center">
@@ -325,9 +338,9 @@ function AnalysisContent() {
                                         </p>
                                     </div>
                                     <div className="bg-white/50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-purple-600">Readiness</p>
-                                        <p className="text-lg font-bold text-purple-900 capitalize">
-                                            {aiRecommendation.readinessLevel}
+                                        <p className="text-xs text-purple-600">Ready Soon</p>
+                                        <p className={`text-lg font-bold ${aiRecommendation.readySoon ? 'text-green-600' : 'text-red-500'}`}>
+                                            {aiRecommendation.readySoon ? 'Yes' : 'No'}
                                         </p>
                                     </div>
                                 </div>
@@ -470,7 +483,14 @@ function AnalysisContent() {
                                             <Sparkles className="w-5 h-5 text-purple-600 mt-0.5" />
                                             <div>
                                                 <p className="font-medium text-purple-900">AI Health Assistant Suggests:</p>
-                                                <p className="text-purple-700 text-sm mt-1">{aiRecommendation.healthAdvice}</p>
+                                                <ul className="mt-1 space-y-1">
+                                                    {splitAdvice(aiRecommendation.healthAdvice).map((tip, i) => (
+                                                        <li key={i} className="flex items-start gap-2 text-purple-700 text-sm">
+                                                            <span className="mt-1 shrink-0">•</span>
+                                                            <span>{tip}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                                 {aiRecommendation.nextDonationDays > 0 && (
                                                     <p className="text-purple-600 text-sm mt-2">
                                                         <Calendar className="w-4 h-4 inline mr-1" />
