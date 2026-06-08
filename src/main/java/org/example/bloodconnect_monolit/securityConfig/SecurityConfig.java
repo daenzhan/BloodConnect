@@ -151,9 +151,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/admin/licenses/pending").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/admin/licenses/verify").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/admin/create-admin").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/admin/change-password").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin/audit-logs").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin/activity-stats").hasRole("ADMIN")
+
+                        // FILE UPLOAD
                         .requestMatchers(HttpMethod.POST, "/api/files/upload/**").hasAnyRole("BLOOD_CENTER", "MEDICAL_CENTER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/files/download/**").permitAll()
+
                         .anyRequest().authenticated()
+
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

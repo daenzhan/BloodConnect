@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, FileCheck, Settings, LogOut, Shield, Heart } from "lucide-react";
+import { LayoutDashboard, Users, FileCheck, Settings, LogOut, Shield, Heart, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -10,7 +10,7 @@ const navigation = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "License Verification", href: "/admin/licenses", icon: FileCheck },
-    { name: "Settings", href: "/admin/settings", icon: Settings },
+    { name: "License History", href: "/admin/license-history", icon: History },
 ];
 
 export function AdminSidebar() {
@@ -49,7 +49,6 @@ export function AdminSidebar() {
 
     return (
         <aside className="fixed top-0 left-0 z-30 flex flex-col w-16 lg:w-64 h-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg transition-all duration-300">
-            {/* Logo */}
             <div className="flex-shrink-0 p-4">
                 <div className="flex items-center justify-center lg:justify-start gap-3">
                     <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -59,7 +58,6 @@ export function AdminSidebar() {
                 </div>
             </div>
 
-            {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-2 py-4 custom-scrollbar">
                 <ul className="space-y-2">
                     {navigation.map((item) => {
@@ -89,7 +87,6 @@ export function AdminSidebar() {
                 </ul>
             </nav>
 
-            {/* Logout */}
             <div className="flex-shrink-0 p-4 border-t border-white/20">
                 <button
                     onClick={handleLogout}

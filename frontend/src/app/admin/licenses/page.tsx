@@ -12,7 +12,19 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Eye, CheckCircle, XCircle, Building2, FileText } from "lucide-react";
+import {
+    Loader2,
+    Eye,
+    CheckCircle,
+    XCircle,
+    Building2,
+    FileText,
+    Clock,
+    AlertCircle,
+    Mail,
+    Phone,
+    Calendar
+} from "lucide-react";
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -157,26 +169,59 @@ export default function AdminLicensesPage() {
                     <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold mb-2">All Licenses Verified</h3>
                     <p className="text-muted-foreground">No pending license verifications at this time</p>
+                    <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => window.location.href = '/admin/license-history'}
+                    >
+                        View License History
+                    </Button>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 gap-4">
                     {licenses.map((license) => (
-                        <Card key={`${license.type}-${license.id}`} className="p-6 hover:shadow-md transition-shadow">
+                        <Card key={`${license.type}-${license.id}`} className="p-6 hover:shadow-lg transition-all">
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Building2 className="w-5 h-5 text-primary" />
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                            <Building2 className="w-5 h-5 text-primary" />
+                                        </div>
                                         <h3 className="text-lg font-semibold text-foreground">{license.name}</h3>
-                                        <Badge className="bg-yellow-100 text-yellow-700">
+                                        <Badge className={
+                                            license.type === "BLOOD_CENTER"
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-purple-100 text-purple-700"
+                                        }>
                                             {license.type === "BLOOD_CENTER" ? "Blood Center" : "Medical Center"}
+                                        </Badge>
+                                        <Badge className="bg-yellow-100 text-yellow-700">
+                                            <Clock className="w-3 h-3 mr-1" />
+                                            Pending Review
                                         </Badge>
                                     </div>
 
-                                    <div className="space-y-1 text-sm text-muted-foreground">
-                                        <p>📍 {license.location}</p>
-                                        <p>👤 Director: {license.directorFullName}</p>
-                                        <p>📧 {license.userEmail}</p>
-                                        <p>📅 Registered: {formatDate(license.createdAt)}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                        <div className="space-y-1 text-sm">
+                                            <p className="text-muted-foreground flex items-center gap-1">
+                                                <Building2 className="w-3 h-3" />
+                                                Location: <span className="text-foreground">{license.location}</span>
+                                            </p>
+                                            <p className="text-muted-foreground flex items-center gap-1">
+                                                <Mail className="w-3 h-3" />
+                                                Email: <span className="text-foreground">{license.userEmail}</span>
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1 text-sm">
+                                            <p className="text-muted-foreground flex items-center gap-1">
+                                                <AlertCircle className="w-3 h-3" />
+                                                Director: <span className="text-foreground">{license.directorFullName}</span>
+                                            </p>
+                                            <p className="text-muted-foreground flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                Registered: <span className="text-foreground">{formatDate(license.createdAt)}</span>
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div className="mt-3 flex flex-wrap gap-2">
@@ -197,10 +242,10 @@ export default function AdminLicensesPage() {
                                             setReviewDialogOpen(true);
                                             setRejectionReason("");
                                         }}
-                                        className="bg-green-600 hover:bg-green-700"
+                                        className="bg-primary hover:bg-primary/90"
                                     >
                                         <Eye className="w-4 h-4 mr-2" />
-                                        Review
+                                        Review Application
                                     </Button>
                                 </div>
                             </div>
@@ -212,51 +257,71 @@ export default function AdminLicensesPage() {
             <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Review License</DialogTitle>
+                        <DialogTitle>Review License Application</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                            <p className="text-sm text-gray-600">
-                                <strong>{selectedLicense?.name}</strong> is requesting to join as a{" "}
-                                {selectedLicense?.type === "BLOOD_CENTER" ? "Blood Center" : "Medical Center"}
+                        <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg">
+                            <p className="font-semibold text-gray-800">{selectedLicense?.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                                is requesting to join as a{" "}
+                                <span className="font-medium">
+                                    {selectedLicense?.type === "BLOOD_CENTER" ? "Blood Center" : "Medical Center"}
+                                </span>
                             </p>
                         </div>
 
-                        {rejectionReason && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Rejection Reason</label>
-                                <Textarea
-                                    value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
-                                    placeholder="Enter reason for rejection..."
-                                    rows={3}
-                                />
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Review Decision</label>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => handleVerifyLicense("APPROVED")}
+                                    disabled={isProcessing}
+                                    className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Approve
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (!rejectionReason) {
+                                            alert("Please provide a reason for rejection");
+                                            return;
+                                        }
+                                        handleVerifyLicense("REJECTED");
+                                    }}
+                                    disabled={isProcessing}
+                                    className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <XCircle className="w-4 h-4" />
+                                    Reject
+                                </button>
                             </div>
-                        )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Rejection Reason (required if rejecting)</label>
+                            <Textarea
+                                value={rejectionReason}
+                                onChange={(e) => setRejectionReason(e.target.value)}
+                                placeholder="Enter reason for rejection..."
+                                rows={3}
+                                className="resize-none"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                This reason will be sent to the applicant via email
+                            </p>
+                        </div>
+
+                        <div className="p-3 bg-blue-50 rounded-lg">
+                            <p className="text-xs text-blue-700">
+                                <strong>💡 Tip:</strong> Before approving, make sure to review the license document carefully.
+                                Provide clear rejection reasons to help the applicant understand what needs correction.
+                            </p>
+                        </div>
                     </div>
-                    <DialogFooter className="gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => setReviewDialogOpen(false)}
-                            disabled={isProcessing}
-                        >
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={isProcessing}>
                             Cancel
-                        </Button>
-                        <Button
-                            onClick={() => handleVerifyLicense("APPROVED")}
-                            disabled={isProcessing}
-                            className="bg-green-600 hover:bg-green-700"
-                        >
-                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-                            Approve
-                        </Button>
-                        <Button
-                            onClick={() => handleVerifyLicense("REJECTED")}
-                            disabled={isProcessing}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
-                            Reject
                         </Button>
                     </DialogFooter>
                 </DialogContent>

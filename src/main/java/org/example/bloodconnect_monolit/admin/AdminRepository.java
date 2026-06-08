@@ -17,4 +17,6 @@ public interface AdminRepository extends JpaRepository<User, Long> {
     long countMedicalCenters();
     List<User> findByRole(String role);
     List<User> findByIsActive(boolean isActive);
+    long countByIsActiveTrue();
+    long countByIsActiveFalse();
 }

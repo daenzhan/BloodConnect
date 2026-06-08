@@ -50,29 +50,6 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-
-    @GetMapping("/licenses")
-    public ResponseEntity<List<LicenseVerificationDTO>> getLicenses(@RequestParam(required = false) String status) {
-        if ("PENDING".equals(status)) {
-            return ResponseEntity.ok(adminService.getPendingLicenses());
-        } else if ("APPROVED".equals(status)) {
-            return ResponseEntity.ok(adminService.getApprovedLicenses());
-        } else if ("REJECTED".equals(status)) {
-            return ResponseEntity.ok(adminService.getRejectedLicenses());
-        }
-        return ResponseEntity.ok(adminService.getAllLicenses());
-    }
-
-    @GetMapping("/licenses/blood-centers")
-    public ResponseEntity<List<LicenseVerificationDTO>> getBloodCenterLicenses() {
-        return ResponseEntity.ok(adminService.getLicensesByType("BLOOD_CENTER"));
-    }
-
-    @GetMapping("/licenses/medical-centers")
-    public ResponseEntity<List<LicenseVerificationDTO>> getMedicalCenterLicenses() {
-        return ResponseEntity.ok(adminService.getLicensesByType("MEDICAL_CENTER"));
-    }
-
     @GetMapping("/licenses/pending")
     public ResponseEntity<List<LicenseVerificationDTO>> getPendingLicenses() {
         return ResponseEntity.ok(adminService.getPendingLicenses());
@@ -98,5 +75,30 @@ public class AdminController {
         Map<String, String> response = new HashMap<>();
         response.put("message", "Admin created successfully");
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/licenses/verified")
+    public ResponseEntity<List<LicenseVerificationDTO>> getVerifiedLicenses() {
+        return ResponseEntity.ok(adminService.getApprovedLicenses());
+    }
+
+    @GetMapping("/licenses/rejected")
+    public ResponseEntity<List<LicenseVerificationDTO>> getRejectedLicenses() {
+        return ResponseEntity.ok(adminService.getRejectedLicenses());
+    }
+
+    @GetMapping("/licenses/all")
+    public ResponseEntity<List<LicenseVerificationDTO>> getAllLicenseHistory() {
+        return ResponseEntity.ok(adminService.getAllLicenses());
+    }
+
+    @GetMapping("/licenses/stats")
+    public ResponseEntity<Map<String, Object>> getLicenseStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", adminService.getAllLicenses().size());
+        stats.put("pending", adminService.getPendingLicenses().size());
+        stats.put("approved", adminService.getApprovedLicenses().size());
+        stats.put("rejected", adminService.getRejectedLicenses().size());
+        return ResponseEntity.ok(stats);
     }
 }
